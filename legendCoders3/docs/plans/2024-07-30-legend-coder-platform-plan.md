@@ -1019,3 +1019,364 @@ Expected: `backend/app/main.py` 파일이 업데이트됩니다.
 git add backend/requirements.txt backend/app/schemas.py backend/app/crud/daily_problems.py backend/app/services/problem_selector.py backend/app/routers/daily_problems.py backend/app/main.py backend/app/tasks/scheduler.py backend/app/crud/
 git commit -m "feat: Implement AI-driven daily problem selection and API"
 ```
+
+### Task 5: 제출 결과 등록 및 채점 (Submission Result Registration & Judging)
+
+**Goal:** 사용자가 백준에 직접 제출한 문제의 결과를 플랫폼에 등록하고, 백준 웹사이트를 크롤링하여 채점 결과를 가져와 저장하는 API 엔드포인트를 구현합니다.
+
+**Files:**
+- Modify: `backend/requirements.txt`
+- Create: `backend/app/crud/submissions.py`
+- Create: `backend/app/services/baekjoon_crawler.py`
+- Modify: `backend/app/schemas.py` (Pydantic schemas for submissions)
+- Create: `backend/app/routers/submissions.py`
+- Modify: `backend/app/main.py`
+- Create: `backend/app/tasks/submission_processor.py` (Optional: for background processing of submission results)
+
+**Step 1: 필요한 의존성 설치**
+
+```bash
+pip install requests beautifulsoup4 # 이미 설치됨. 필요 시 재확인.
+```
+Expected: `requests`, `beautifulsoup4` 라이브러리가 설치되어 있거나 최신 상태입니다.
+
+**Step 2: `backend/app/schemas.py` 파일 업데이트 (Submission 스키마 추가)**
+
+`backend/app/schemas.py` 파일을 열고 아래 `SubmissionBase`, `SubmissionCreate`, `Submission` Pydantic 모델을 추가합니다.
+
+```python
+# backend/app/schemas.py (기존 내용에 추가)
+# ... (기존 User, DailyProblem 등 스키마)
+
+class SubmissionBase(BaseModel):
+    daily_problem_id: uuid.UUID
+    baekjoon_submission_id: int
+    language: str
+    code: Optional[str] = None # 크롤링 실패 시 None 가능
+    status: str
+    result_message: Optional[str] = None
+    runtime_ms: Optional[int] = None
+    memory_usage_kb: Optional[int] = None
+    submitted_at: datetime # 백준 제출 시각 또는 플랫폼 등록 시각
+
+class SubmissionCreate(SubmissionBase):
+    pass
+
+class Submission(SubmissionBase):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    baekjoon_problem_id: int # Submission 모델에 baekjoon_problem_id 추가 (편의상)
+    
+    class Config:
+        orm_mode = True
+
+class SubmissionRegisterRequest(BaseModel):
+    daily_problem_id: uuid.UUID
+    baekjoon_submission_id: int # 사용자가 직접 입력하는 백준 제출 ID
+```
+Expected: `backend/app/schemas.py` 파일이 업데이트됩니다.
+
+**Step 3: `backend/app/crud/submissions.py` 파일 생성 (Submission CRUD)**
+
+`backend/app/crud` 디렉토리는 이미 존재합니다.
+
+```python
+# backend/app/crud/submissions.py
+from sqlalchemy.orm import Session
+from .. import models, schemas
+from datetime import datetime
+import uuid
+
+def get_submission(db: Session, submission_id: uuid.UUID):
+    return db.query(models.Submission).filter(models.Submission.id == submission_id).first()
+
+def get_user_submissions_for_problem(db: Session, user_id: uuid.UUID, daily_problem_id: uuid.UUID):
+    return db.query(models.Submission).filter(
+        models.Submission.user_id == user_id,
+        models.Submission.daily_problem_id == daily_problem_id
+    ).all()
+
+def create_submission(db: Session, user_id: uuid.UUID, submission: schemas.SubmissionCreate, baekjoon_problem_id: int):
+    db_submission = models.Submission(
+        user_id=user_id,
+        daily_problem_id=submission.daily_problem_id,
+        baekjoon_problem_id=baekjoon_problem_id,
+        baekjoon_submission_id=submission.baekjoon_submission_id,
+        language=submission.language,
+        code=submission.code,
+        status=submission.status,
+        result_message=submission.result_message,
+        runtime_ms=submission.runtime_ms,
+        memory_usage_kb=submission.memory_usage_kb,
+        submitted_at=submission.submitted_at
+    )
+    db.add(db_submission)
+    db.commit()
+    db.refresh(db_submission)
+    return db_submission
+
+def update_submission_status(db: Session, submission_id: uuid.UUID, status: str, result_message: Optional[str] = None, runtime_ms: Optional[int] = None, memory_usage_kb: Optional[int] = None, code: Optional[str] = None):
+    db_submission = db.query(models.Submission).filter(models.Submission.id == submission_id).first()
+    if db_submission:
+        db_submission.status = status
+        db_submission.result_message = result_message
+        db_submission.runtime_ms = runtime_ms
+        db_submission.memory_usage_kb = memory_usage_kb
+        if code:
+            db_submission.code = code
+        db.commit()
+        db.refresh(db_submission)
+    return db_submission
+```
+Expected: `backend/app/crud/submissions.py` 파일이 생성됩니다.
+
+**Step 4: `backend/app/services/baekjoon_crawler.py` 파일 생성 (백준 제출 결과 크롤러)**
+
+이 파일은 백준 웹사이트에서 사용자 제출 결과를 크롤링하는 기능을 담당합니다.
+
+```python
+# backend/app/services/baekjoon_crawler.py
+import requests
+from bs4 import BeautifulSoup
+import time
+from typing import Dict, Any, Optional
+
+BAEKJOON_SUBMISSION_STATUS_URL = "https://www.acmicpc.net/status"
+BAEKJOON_SUBMISSION_DETAIL_URL = "https://www.acmicpc.net/source/download/" # submission_id
+
+def get_submission_result_from_baekjoon(baekjoon_submission_id: int, baekjoon_username: str) -> Optional[Dict[str, Any]]:
+    """
+    백준 제출 ID와 사용자 이름으로 제출 결과를 크롤링합니다.
+    """
+    params = {
+        "user_id": baekjoon_username,
+        "result_id": baekjoon_submission_id
+    }
+    
+    # 제출 결과 페이지 요청
+    try:
+        response = requests.get(BAEKJOON_SUBMISSION_STATUS_URL, params=params, timeout=15)
+        response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching submission status for ID {baekjoon_submission_id} and user {baekjoon_username}: {e}")
+        return None
+
+    soup = BeautifulSoup(response.text, "html.parser")
+    
+    # 결과 파싱 (백준 사이트 구조 변경에 따라 수정 필요)
+    # 테이블에서 해당 제출 ID의 결과 행 찾기
+    result_row = soup.select_one(f"tr#solution-{baekjoon_submission_id}")
+    
+    if not result_row:
+        print(f"Submission ID {baekjoon_submission_id} not found in status page for user {baekjoon_username}.")
+        return None
+
+    columns = result_row.find_all("td")
+    
+    if len(columns) < 9: # 예상 컬럼 수보다 적으면 파싱 불가
+        print(f"Not enough columns in submission row for ID {baekjoon_submission_id}.")
+        return None
+    
+    # 컬럼 인덱스를 기반으로 데이터 추출 (순서가 고정적이라는 가정 하에)
+    # 보통 컬럼 순서: 제출번호, 아이디, 문제, 결과, 메모리, 시간, 언어, 코드 길이, 제출시간
+    status_text = columns[3].get_text(strip=True)
+    memory_usage_kb = int(columns[4].get_text(strip=True).replace('KB', '')) if 'KB' in columns[4].get_text(strip=True) else None
+    runtime_ms = int(columns[5].get_text(strip=True).replace('ms', '')) if 'ms' in columns[5].get_text(strip=True) else None
+    language = columns[6].get_text(strip=True)
+    # 제출 시간은 복잡하므로 일단 현재 시각으로 대체
+    submitted_at = datetime.utcnow()
+
+    # 결과 매핑 (백준 결과 텍스트를 내부 상태로 매핑)
+    status_map = {
+        "맞았습니다!!": "Accepted",
+        "런타임 에러": "Runtime Error",
+        "컴파일 에러": "Compile Error",
+        "시간 초과": "Time Limit Exceeded",
+        "메모리 초과": "Memory Limit Exceeded",
+        "출력 형식 틀렸습니다": "Wrong Answer", # 백준은 "틀렸습니다"로 표시될 수도 있음
+        "틀렸습니다": "Wrong Answer",
+        "채점 중": "Judging",
+        # ... 추가적인 상태 매핑
+    }
+    mapped_status = status_map.get(status_text, "Unknown")
+    
+    result_message = status_text # 일단 백준 원본 메시지 그대로 저장
+
+    return {
+        "language": language,
+        "status": mapped_status,
+        "result_message": result_message,
+        "runtime_ms": runtime_ms,
+        "memory_usage_kb": memory_usage_kb,
+        "submitted_at": submitted_at
+    }
+
+def get_submission_code_from_baekjoon(baekjoon_submission_id: int) -> Optional[str]:
+    """
+    백준 제출 ID로 코드 내용을 크롤링합니다.
+    """
+    url = f"{BAEKJOON_SUBMISSION_DETAIL_URL}{baekjoon_submission_id}"
+    try:
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()
+        # 백준은 코드 다운로드 시 텍스트 파일로 직접 응답하는 경우가 많음
+        return response.text
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching submission code for ID {baekjoon_submission_id}: {e}")
+        return None
+
+```
+Expected: `backend/app/services/baekjoon_crawler.py` 파일이 생성됩니다.
+
+**Step 5: `backend/app/routers/submissions.py` 파일 생성 (제출 API 엔드포인트)**
+
+`backend/app/routers` 디렉토리는 이미 존재합니다.
+
+```python
+# backend/app/routers/submissions.py
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+from datetime import datetime
+from .. import schemas
+from ..crud import daily_problems, submissions # crud.submissions 추가
+from ..services.baekjoon_crawler import get_submission_result_from_baekjoon, get_submission_code_from_baekjoon
+from ..database import get_db
+from ..auth import get_current_user
+from ..models import User
+import asyncio # 비동기 작업을 위해 필요
+
+router = APIRouter(
+    prefix="/submissions",
+    tags=["submissions"],
+    responses={404: {"description": "Not found"}},
+)
+
+@router.post("/register", response_model=schemas.Submission)
+async def register_submission_result(
+    submission_request: schemas.SubmissionRegisterRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    # 1. 일일 문제 확인
+    daily_problem = daily_problems.get_daily_problem_by_id(db, submission_request.daily_problem_id)
+    if not daily_problem:
+        raise HTTPException(status_code=404, detail="Daily problem not found.")
+
+    # 2. 백준에서 제출 결과 크롤링
+    crawled_result = get_submission_result_from_baekjoon(
+        submission_request.baekjoon_submission_id,
+        current_user.baekjoon_id
+    )
+    if not crawled_result:
+        raise HTTPException(status_code=500, detail="Failed to crawl submission result from Baekjoon.")
+
+    # 3. 크롤링된 코드 내용 가져오기 (비동기 처리 필요)
+    # 현재는 Blocking Call이므로 주의. 실제 서비스에서는 백그라운드 태스크로 분리하여 처리.
+    crawled_code = get_submission_code_from_baekjoon(submission_request.baekjoon_submission_id)
+    
+    # 4. Submission 객체 생성 및 저장
+    submission_create = schemas.SubmissionCreate(
+        daily_problem_id=submission_request.daily_problem_id,
+        baekjoon_submission_id=submission_request.baekjoon_submission_id,
+        baekjoon_problem_id=daily_problem.baekjoon_problem_id, # 일일 문제에서 가져옴
+        language=crawled_result.get("language", "Unknown"),
+        code=crawled_code,
+        status=crawled_result.get("status", "Unknown"),
+        result_message=crawled_result.get("result_message"),
+        runtime_ms=crawled_result.get("runtime_ms"),
+        memory_usage_kb=crawled_result.get("memory_usage_kb"),
+        submitted_at=crawled_result.get("submitted_at", datetime.utcnow())
+    )
+    db_submission = submissions.create_submission(
+        db=db,
+        user_id=current_user.id,
+        submission=submission_create,
+        baekjoon_problem_id=daily_problem.baekjoon_problem_id
+    )
+    return db_submission
+
+@router.get("/{submission_id}", response_model=schemas.Submission)
+def get_single_submission(
+    submission_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    db_submission = submissions.get_submission(db, submission_id)
+    if not db_submission or db_submission.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Submission not found or not authorized.")
+    return db_submission
+
+@router.get("/problem/{daily_problem_id}", response_model=List[schemas.Submission])
+def get_user_submissions_for_problem(
+    daily_problem_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    db_submissions = submissions.get_user_submissions_for_problem(db, current_user.id, daily_problem_id)
+    return db_submissions
+```
+Expected: `backend/app/routers/submissions.py` 파일이 생성됩니다.
+
+**Step 6: `backend/app/main.py` 파일 업데이트 (submissions 라우터 포함)**
+
+`backend/app/main.py` 파일을 열고 `submissions` 라우터를 앱에 포함시킵니다.
+
+```python
+# backend/app/main.py (기존 내용에 추가)
+from fastapi import FastAPI
+import uvicorn
+import os
+from dotenv import load_dotenv
+
+from .routers import users, daily_problems, submissions # submissions 추가
+from .tasks.scheduler import start_scheduler
+
+load_dotenv()
+
+app = FastAPI(title="Legend Coder Platform API")
+
+app.include_router(users.router)
+app.include_router(daily_problems.router)
+app.include_router(submissions.router) # submissions 라우터 포함
+
+@app.on_event("startup")
+async def startup_event():
+    print("Starting up application...")
+    start_scheduler()
+
+@app.get("/")
+async def root():
+    return {"message": "Welcome to Legend Coder Platform API"}
+
+```
+Expected: `backend/app/main.py` 파일이 업데이트됩니다.
+
+**Step 7: `backend/app/crud/__init__.py` 파일 업데이트 (submissions crud 모듈 임포트)**
+
+`backend/app/crud/__init__.py` 파일을 열고 `submissions` 모듈을 임포트합니다.
+
+```python
+# backend/app/crud/__init__.py (기존 내용에 추가)
+from . import daily_problems
+from . import submissions # submissions 모듈 임포트
+```
+Expected: `backend/app/crud/__init__.py` 파일이 업데이트됩니다.
+
+**Step 8: API 테스트**
+
+(FastAPI 서버 실행: `uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`)
+웹 브라우저에서 `http://localhost:8000/docs`에 접속하여 Swagger UI를 통해 다음을 테스트합니다:
+1.  **사용자 생성 및 로그인하여 토큰 획득.**
+2.  **`GET /daily-problems/today`를 통해 오늘의 문제 `daily_problem_id`를 획득합니다.**
+3.  **백준 웹사이트에서 해당 `baekjoon_problem_id` 문제를 풀고, 제출한 후 `baekjoon_submission_id`를 복사합니다.**
+4.  **`POST /submissions/register`를 통해 `daily_problem_id`와 `baekjoon_submission_id`를 제출합니다.**
+    *   Response body를 확인하여 제출 결과가 올바르게 등록되었는지 확인합니다.
+5.  **`GET /submissions/{submission_id}` 또는 `GET /submissions/problem/{daily_problem_id}`를 통해 등록된 제출 결과를 조회합니다.**
+
+**Step 9: Commit**
+
+```bash
+git add backend/requirements.txt backend/app/schemas.py backend/app/crud/submissions.py backend/app/services/baekjoon_crawler.py backend/app/routers/submissions.py backend/app/main.py backend/app/crud/__init__.py
+git commit -m "feat: Implement submission result registration and judging via Baekjoon crawling"
+```
+```
