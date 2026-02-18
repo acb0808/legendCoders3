@@ -624,5 +624,398 @@ Expected: `.env` 파일에 `SECRET_KEY` 및 `ACCESS_TOKEN_EXPIRE_MINUTES` 환경
 
 ```bash
 git add backend/requirements.txt backend/schemas.py backend/crud.py backend/auth.py backend/routers/users.py backend/main.py backend/.env
+git add backend/requirements.txt backend/schemas.py backend/crud.py backend/auth.py backend/routers/users.py backend/main.py backend/.env
 git commit -m "feat: Implement user authentication with registration, login, and profile"
+```
+
+### Task 4: AI 기반 문제 선정 API 구현
+
+**Goal:** AI 기반으로 백준 문제를 선정하고 저장하며, 오늘의 문제 정보를 제공하는 API 엔드포인트를 구현합니다.
+
+**Files:**
+- Modify: `backend/requirements.txt`
+- Create: `backend/app/crud/daily_problems.py`
+- Create: `backend/app/services/problem_selector.py`
+- Modify: `backend/app/schemas.py` (Pydantic schemas for daily problems)
+- Create: `backend/app/routers/daily_problems.py`
+- Modify: `backend/app/main.py`
+- Create: `backend/app/tasks/scheduler.py` (for daily scheduling)
+
+**Step 1: 필요한 의존성 설치**
+
+```bash
+pip install requests beautifulsoup4 apscheduler pytz
+```
+Expected: `requests`, `beautifulsoup4`, `apscheduler`, `pytz` 라이브러리가 설치됩니다.
+
+**Step 2: `requirements.txt` 업데이트**
+
+```bash
+pip freeze > backend/requirements.txt
+```
+Expected: `backend/requirements.txt` 파일에 새로 설치된 의존성이 추가됩니다.
+
+**Step 3: `backend/app/schemas.py` 파일 업데이트 (DailyProblem 스키마 추가)**
+
+`backend/app/schemas.py` 파일을 열고 아래 `DailyProblemBase`, `DailyProblemCreate`, `DailyProblem` Pydantic 모델을 추가합니다.
+
+```python
+# backend/app/schemas.py (기존 내용에 추가)
+# ... (기존 User, Token 등 스키마)
+
+class DailyProblemBase(BaseModel):
+    problem_date: datetime
+    baekjoon_problem_id: int
+    title: str
+    description: str
+    input_example: str
+    output_example: str
+    time_limit_ms: int
+    memory_limit_mb: int
+    difficulty_level: str
+    algorithm_type: List[str]
+
+class DailyProblemCreate(DailyProblemBase):
+    pass
+
+class DailyProblem(DailyProblemBase):
+    id: uuid.UUID
+    created_at: datetime
+
+    class Config:
+        orm_mode = True
+```
+Expected: `backend/app/schemas.py` 파일이 업데이트됩니다.
+
+**Step 4: `backend/app/crud/daily_problems.py` 파일 생성 (DailyProblem CRUD)**
+
+`backend/app/crud` 디렉토리가 없으므로 먼저 생성합니다.
+
+```bash
+mkdir backend/app/crud
+```
+
+`backend/app/crud/daily_problems.py` 파일의 내용은 다음과 같습니다.
+
+```python
+# backend/app/crud/daily_problems.py
+from sqlalchemy.orm import Session
+from datetime import date, datetime
+from .. import models, schemas
+
+def get_daily_problem_by_date(db: Session, problem_date: date):
+    return db.query(models.DailyProblem).filter(
+        models.DailyProblem.problem_date == problem_date
+    ).first()
+
+def get_daily_problem_by_baekjoon_id(db: Session, baekjoon_problem_id: int):
+    return db.query(models.DailyProblem).filter(
+        models.DailyProblem.baekjoon_problem_id == baekjoon_problem_id
+    ).first()
+
+def create_daily_problem(db: Session, daily_problem: schemas.DailyProblemCreate):
+    db_problem = models.DailyProblem(
+        problem_date=daily_problem.problem_date,
+        baekjoon_problem_id=daily_problem.baekjoon_problem_id,
+        title=daily_problem.title,
+        description=daily_problem.description,
+        input_example=daily_problem.input_example,
+        output_example=daily_problem.output_example,
+        time_limit_ms=daily_problem.time_limit_ms,
+        memory_limit_mb=daily_problem.memory_limit_mb,
+        difficulty_level=daily_problem.difficulty_level,
+        algorithm_type=daily_problem.algorithm_type,
+    )
+    db.add(db_problem)
+    db.commit()
+    db.refresh(db_problem)
+    return db_problem
+```
+Expected: `backend/app/crud/daily_problems.py` 파일이 생성됩니다.
+
+**Step 5: `backend/app/services/problem_selector.py` 파일 생성 (AI 문제 선정 로직)**
+
+이 파일은 백준 웹사이트에서 문제 정보를 가져오고, AI 로직에 따라 문제를 선정하는 기능을 담당합니다. (최초 버전은 간단한 무작위 선택 후 상세 정보 크롤링으로 시작)
+
+```python
+# backend/app/services/problem_selector.py
+import requests
+from bs4 import BeautifulSoup
+from datetime import date, datetime, timedelta
+from sqlalchemy.orm import Session
+import random
+import os
+from dotenv import load_dotenv
+
+from .. import crud # crud 패키지 전체 임포트
+from ..schemas import DailyProblemCreate
+
+load_dotenv()
+
+BAEKJOON_URL = "https://www.acmicpc.net/problem/"
+
+# 임시 방편: 난이도별 문제 ID 목록 (실제로는 동적으로 가져오거나 더 정교한 DB 쿼리 사용)
+# 여기서는 간단한 예시로 고정된 문제 ID 사용
+# 실제 AI 로직은 난이도, 유형, 최근 출제 이력 등을 고려하여 구현됨
+HARDCODED_PROBLEM_IDS_GOLD = [1000, 1001, 1002, 1003, 1004, 1005] # 예시
+HARDCODED_PROBLEM_IDS_SILVER = [2000, 2001, 2002, 2003, 2004, 2005] # 예시
+
+def get_problem_details_from_baekjoon(problem_id: int):
+    url = f"{BAEKJOON_URL}{problem_id}"
+    try:
+        response = requests.get(url, timeout=10)
+        response.raise_for_status() # HTTP 오류 발생 시 예외 발생
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching problem {problem_id} from Baekjoon: {e}")
+        return None
+
+    soup = BeautifulSoup(response.text, "html.parser")
+
+    title = soup.select_one("#problem_title").get_text(strip=True) if soup.select_one("#problem_title") else "제목 없음"
+    description = str(soup.select_one("#problem_description")) if soup.select_one("#problem_description") else "설명 없음"
+    # 예시 입출력 파싱 (복잡하므로 간단히 첫 번째 예시만 가져오거나 더 정교하게 처리 필요)
+    input_example_elem = soup.select_one(".sampledata[id^='sample-input']")
+    input_example = input_example_elem.get_text(strip=True) if input_example_elem else "입력 예시 없음"
+
+    output_example_elem = soup.select_one(".sampledata[id^='sample-output']")
+    output_example = output_example_elem.get_text(strip=True) if output_example_elem else "출력 예시 없음"
+
+    # 시간/메모리 제한 (파싱 로직은 백준 페이지 구조에 따라 달라질 수 있음)
+    time_limit_ms = 2000 # 기본값 (파싱 어려우면 고정값 사용)
+    memory_limit_mb = 512 # 기본값
+
+    # 난이도 및 알고리즘 유형 (파싱이 복잡하므로 임시 값 사용)
+    difficulty_level = "Gold V" # 임시
+    algorithm_type = ["DP", "Graph"] # 임시
+
+    return {
+        "baekjoon_problem_id": problem_id,
+        "title": title,
+        "description": description,
+        "input_example": input_example,
+        "output_example": output_example,
+        "time_limit_ms": time_limit_ms,
+        "memory_limit_mb": memory_limit_mb,
+        "difficulty_level": difficulty_level,
+        "algorithm_type": algorithm_type,
+    }
+
+
+def select_daily_problem(db: Session, for_date: date):
+    # 오늘 또는 이미 선정된 문제가 있는지 확인
+    existing_problem = crud.daily_problems.get_daily_problem_by_date(db, for_date)
+    if existing_problem:
+        print(f"Problem already selected for {for_date}: {existing_problem.baekjoon_problem_id}")
+        return existing_problem
+
+    # AI 로직 (임시: 무작위 문제 선정)
+    # 실제로는 난이도, 유형, 최근 출제 이력 등을 고려
+    problem_ids_to_consider = HARDCODED_PROBLEM_IDS_GOLD + HARDCODED_PROBLEM_IDS_SILVER
+    selected_id = random.choice(problem_ids_to_consider)
+    
+    # 문제 상세 정보 크롤링
+    problem_details = get_problem_details_from_baekjoon(selected_id)
+    
+    if problem_details:
+        daily_problem_create = DailyProblemCreate(
+            problem_date=datetime.combine(for_date, datetime.min.time()),
+            **problem_details
+        )
+        new_problem = crud.daily_problems.create_daily_problem(db, daily_problem_create)
+        print(f"Successfully selected and saved problem {new_problem.baekjoon_problem_id} for {for_date}")
+        return new_problem
+    else:
+        print(f"Failed to get details for problem {selected_id}. Skipping selection for {for_date}.")
+        return None
+```
+Expected: `backend/app/services/problem_selector.py` 파일이 생성됩니다.
+
+**Step 6: `backend/app/routers/daily_problems.py` 파일 생성 (일일 문제 API 엔드포인트)**
+
+`backend/app/routers` 디렉토리는 이미 존재합니다.
+
+```python
+# backend/app/routers/daily_problems.py
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
+from datetime import date, datetime
+from .. import schemas, crud
+from ..database import get_db
+
+router = APIRouter(
+    prefix="/daily-problems",
+    tags=["daily-problems"],
+    responses={404: {"description": "Not found"}},
+)
+
+@router.get("/today", response_model=schemas.DailyProblem)
+def get_today_problem(db: Session = Depends(get_db)):
+    today = date.today()
+    problem = crud.daily_problems.get_daily_problem_by_date(db, today)
+    if not problem:
+        # TODO: AI 문제 선정 로직을 여기서 트리거하거나 스케줄러가 이미 실행했다고 가정
+        # for_date = datetime.utcnow().date() + timedelta(days=1) # 다음날 문제 선정
+        raise HTTPException(status_code=404, detail="No problem selected for today yet.")
+    return problem
+
+@router.get("/{problem_date}", response_model=schemas.DailyProblem)
+def get_problem_by_date(problem_date: date, db: Session = Depends(get_db)):
+    problem = crud.daily_problems.get_daily_problem_by_date(db, problem_date)
+    if not problem:
+        raise HTTPException(status_code=404, detail="Problem not found for this date.")
+    return problem
+```
+Expected: `backend/app/routers/daily_problems.py` 파일이 생성됩니다.
+
+**Step 7: `backend/app/main.py` 파일 업데이트 (daily_problems 라우터 포함)**
+
+`backend/app/main.py` 파일을 열고 `daily_problems` 라우터를 앱에 포함시킵니다.
+
+```python
+# backend/app/main.py (기존 내용에 추가)
+from fastapi import FastAPI
+import uvicorn
+import os
+from dotenv import load_dotenv
+
+from .routers import users, daily_problems # daily_problems 추가
+
+load_dotenv()
+
+app = FastAPI(title="Legend Coder Platform API")
+
+app.include_router(users.router)
+app.include_router(daily_problems.router) # daily_problems 라우터 포함
+
+@app.get("/")
+async def root():
+    return {"message": "Welcome to Legend Coder Platform API"}
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
+```
+Expected: `backend/app/main.py` 파일이 업데이트됩니다.
+
+**Step 8: `backend/app/tasks/scheduler.py` 파일 생성 (일일 문제 선정 스케줄러)**
+
+```python
+# backend/app/tasks/scheduler.py
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
+from datetime import datetime, date, timedelta
+import pytz # 시간대 처리를 위해 필요
+from sqlalchemy.orm import Session
+
+from ..database import SessionLocal
+from ..services.problem_selector import select_daily_problem
+
+# 한국 시간대 설정
+SEOUL_TZ = pytz.timezone("Asia/Seoul")
+
+def schedule_daily_problem_selection():
+    """매일 정해진 시간에 문제 선정을 스케줄링하는 함수."""
+    # Scheduler 인스턴스 생성
+    scheduler = BackgroundScheduler(timezone=SEOUL_TZ)
+
+    # 매일 12시 KST에 다음 날 문제 선정 (예: 오늘 12시에 내일 문제 선정)
+    # CronTrigger: year, month, day, week, day_of_week, hour, minute, second
+    # hour=12, minute=0, second=0
+    trigger = CronTrigger(hour=12, minute=0, second=0, timezone=SEOUL_TZ)
+    
+    # job_id를 명시하여 중복 등록 방지
+    scheduler.add_job(
+        select_and_save_problem,
+        trigger,
+        id="daily_problem_selection_job",
+        replace_existing=True,
+        args=[] # 이 잡은 직접 DB 세션을 생성하여 사용
+    )
+
+    # 스케줄러 시작
+    scheduler.start()
+    print("Scheduler started for daily problem selection.")
+    return scheduler
+
+def select_and_save_problem():
+    """스케줄링된 작업: 다음 날의 문제를 선정하고 DB에 저장."""
+    db: Session = SessionLocal()
+    try:
+        # 오늘 날짜를 기준으로 다음 날의 문제를 선정 (예: 7/30 12시 -> 7/31 문제 선정)
+        target_date = datetime.now(SEOUL_TZ).date() + timedelta(days=1)
+        print(f"Attempting to select daily problem for {target_date}...")
+        select_daily_problem(db, for_date=target_date)
+    except Exception as e:
+        print(f"Error in scheduled daily problem selection: {e}")
+    finally:
+        db.close()
+
+def start_scheduler():
+    # 애플리케이션 시작 시 스케줄러 초기화 및 시작
+    global scheduler_instance
+    scheduler_instance = schedule_daily_problem_selection()
+    # 애플리케이션 시작 시 오늘 문제가 없으면 오늘 문제도 한번 선정 시도 (선택 사항)
+    # db_temp: Session = SessionLocal()
+    # try:
+    #     today = datetime.now(SEOUL_TZ).date()
+    #     if not crud.daily_problems.get_daily_problem_by_date(db_temp, today):
+    #         print(f"No problem for today ({today}). Attempting to select it now...")
+    #         select_daily_problem(db_temp, for_date=today)
+    # except Exception as e:
+    #     print(f"Error selecting today's problem at startup: {e}")
+    # finally:
+    #     db_temp.close()
+
+
+```
+Expected: `backend/app/tasks/scheduler.py` 파일이 생성됩니다.
+
+**Step 9: `backend/app/main.py` 파일 업데이트 (스케줄러 시작)**
+
+`backend/app/main.py` 파일을 열고 애플리케이션 시작 시 스케줄러를 시작하도록 수정합니다.
+
+```python
+# backend/app/main.py (기존 내용에 추가)
+from fastapi import FastAPI
+import uvicorn
+import os
+from dotenv import load_dotenv
+
+from .routers import users, daily_problems
+from .tasks.scheduler import start_scheduler # 스케줄러 임포트
+
+load_dotenv()
+
+app = FastAPI(title="Legend Coder Platform API")
+
+app.include_router(users.router)
+app.include_router(daily_problems.router)
+
+@app.on_event("startup")
+async def startup_event():
+    print("Starting up application...")
+    start_scheduler() # 애플리케이션 시작 시 스케줄러 시작
+
+@app.get("/")
+async def root():
+    return {"message": "Welcome to Legend Coder Platform API"}
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
+```
+Expected: `backend/app/main.py` 파일이 업데이트됩니다.
+
+**Step 10: API 테스트**
+
+(FastAPI 서버 실행: `uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`)
+웹 브라우저에서 `http://localhost:8000/docs`에 접속하여 Swagger UI를 통해 다음을 테스트합니다:
+1.  `GET /daily-problems/today` (오늘의 문제 조회)
+2.  `GET /daily-problems/{problem_date}` (특정 날짜 문제 조회)
+
+(참고: `select_daily_problem`은 매일 12시에 실행되므로, 테스트를 위해 수동으로 DB에 문제를 삽입하거나 `select_and_save_problem()` 함수를 한 번 실행해볼 수 있습니다.)
+
+**Step 11: Commit**
+
+```bash
+git add backend/requirements.txt backend/app/schemas.py backend/app/crud/daily_problems.py backend/app/services/problem_selector.py backend/app/routers/daily_problems.py backend/app/main.py backend/app/tasks/scheduler.py backend/app/crud/
+git commit -m "feat: Implement AI-driven daily problem selection and API"
 ```
