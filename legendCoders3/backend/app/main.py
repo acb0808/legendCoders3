@@ -4,17 +4,21 @@ import uvicorn
 import os
 from dotenv import load_dotenv
 
-from .routers import users # routers는 app 내부의 상대 경로로 유지
+from .routers import users, daily_problems
+from .tasks.scheduler import start_scheduler # 스케줄러 임포트
 
-load_dotenv() # .env 파일에서 환경 변수 로드 (이전과 동일)
+load_dotenv()
 
 app = FastAPI(title="Legend Coder Platform API")
 
 app.include_router(users.router)
+app.include_router(daily_problems.router)
+
+@app.on_event("startup")
+async def startup_event():
+    print("Starting up application...")
+    start_scheduler() # 애플리케이션 시작 시 스케줄러 시작
 
 @app.get("/")
 async def root():
     return {"message": "Welcome to Legend Coder Platform API"}
-
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 8000)))

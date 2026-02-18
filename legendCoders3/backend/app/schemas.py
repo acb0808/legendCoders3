@@ -34,3 +34,26 @@ class TokenData(BaseModel):
     email: Optional[str] = None
 
 # DailyProblem, Submission, Post, Comment 등에 대한 스키마도 추가 예정
+
+class DailyProblemBase(BaseModel):
+    problem_date: datetime
+    baekjoon_problem_id: int
+    title: str
+    description: str
+    input_example: str
+    output_example: str
+    time_limit_ms: int
+    memory_limit_mb: int
+    difficulty_level: str
+    algorithm_type: List[str]
+
+class DailyProblemCreate(DailyProblemBase):
+    pass
+
+class DailyProblem(DailyProblemBase):
+    id: uuid.UUID
+    created_at: datetime
+
+    class Config:
+        orm_mode = True
+
