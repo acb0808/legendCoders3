@@ -4,7 +4,7 @@ import uvicorn
 import os
 from dotenv import load_dotenv
 
-from .routers import users, daily_problems, submissions
+from .routers import users, daily_problems, submissions, posts, comments
 from .tasks.scheduler import start_scheduler
 
 load_dotenv()
@@ -14,6 +14,8 @@ app = FastAPI(title="Legend Coder Platform API")
 app.include_router(users.router)
 app.include_router(daily_problems.router)
 app.include_router(submissions.router)
+app.include_router(posts.router)
+app.include_router(comments.router)
 
 @app.on_event("startup")
 async def startup_event():

@@ -82,3 +82,44 @@ class Submission(SubmissionBase):
 class SubmissionRegisterRequest(BaseModel):
     daily_problem_id: uuid.UUID
     baekjoon_submission_id: Optional[int] = None # 사용자가 직접 입력하거나 생략 가능
+
+class CommentBase(BaseModel):
+    content: str
+    parent_comment_id: Optional[uuid.UUID] = None
+
+class CommentCreate(CommentBase):
+    post_id: uuid.UUID
+
+class Comment(CommentBase):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    post_id: uuid.UUID
+    like_count: int
+    created_at: datetime
+    updated_at: datetime
+    nickname: Optional[str] = None
+
+    class Config:
+        orm_mode = True
+
+class PostBase(BaseModel):
+    title: str
+    content: str
+    tags: Optional[List[str]] = None
+
+class PostCreate(PostBase):
+    daily_problem_id: uuid.UUID
+
+class Post(PostBase):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    daily_problem_id: uuid.UUID
+    view_count: int
+    like_count: int
+    created_at: datetime
+    updated_at: datetime
+    nickname: Optional[str] = None
+    comments: List[Comment] = []
+
+    class Config:
+        orm_mode = True
