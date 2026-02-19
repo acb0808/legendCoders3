@@ -4,7 +4,7 @@ import uvicorn
 import os
 from dotenv import load_dotenv
 
-from .routers import users, daily_problems, submissions, posts, comments
+from .routers import users, daily_problems, submissions, posts, comments, stats
 from .tasks.scheduler import start_scheduler
 
 load_dotenv()
@@ -16,6 +16,7 @@ app.include_router(daily_problems.router)
 app.include_router(submissions.router)
 app.include_router(posts.router)
 app.include_router(comments.router)
+app.include_router(stats.router)
 
 @app.on_event("startup")
 async def startup_event():

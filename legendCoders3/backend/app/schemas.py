@@ -1,7 +1,7 @@
 # backend/schemas.py
 from pydantic import BaseModel, EmailStr
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, date
 import uuid
 
 class UserBase(BaseModel):
@@ -123,3 +123,14 @@ class Post(PostBase):
 
     class Config:
         orm_mode = True
+
+class UserRanking(BaseModel):
+    user_id: uuid.UUID
+    nickname: str
+    solved_count: int
+    consecutive_days: int
+
+class UserDashboard(BaseModel):
+    total_solved: int
+    streak_days: int
+    solve_history: List[date]
