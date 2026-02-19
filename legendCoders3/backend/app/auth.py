@@ -9,7 +9,8 @@ from sqlalchemy.orm import Session
 import os
 from dotenv import load_dotenv
 
-from . import schemas, crud, models
+from . import schemas, models
+from .crud import crud as user_crud # app.crud.crud 모듈을 user_crud로 임포트
 from .database import get_db
 
 load_dotenv()
@@ -51,7 +52,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
         token_data = schemas.TokenData(email=email)
     except JWTError:
         raise credentials_exception
-    user = crud.get_user_by_email(db, email=token_data.email)
+    user = user_crud.get_user_by_email(db, email=token_data.email)
     if user is None:
         raise credentials_exception
     return user

@@ -57,3 +57,28 @@ class DailyProblem(DailyProblemBase):
     class Config:
         orm_mode = True
 
+class SubmissionBase(BaseModel):
+    daily_problem_id: uuid.UUID
+    baekjoon_submission_id: int
+    language: str
+    code: Optional[str] = None # 크롤링 실패 시 None 가능
+    status: str
+    result_message: Optional[str] = None
+    runtime_ms: Optional[int] = None
+    memory_usage_kb: Optional[int] = None
+    submitted_at: datetime # 백준 제출 시각 또는 플랫폼 등록 시각
+
+class SubmissionCreate(SubmissionBase):
+    pass
+
+class Submission(SubmissionBase):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    baekjoon_problem_id: int # Submission 모델에 baekjoon_problem_id 추가 (편의상)
+    
+    class Config:
+        orm_mode = True
+
+class SubmissionRegisterRequest(BaseModel):
+    daily_problem_id: uuid.UUID
+    baekjoon_submission_id: Optional[int] = None # 사용자가 직접 입력하거나 생략 가능

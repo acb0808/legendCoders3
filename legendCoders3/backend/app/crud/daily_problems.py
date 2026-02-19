@@ -1,7 +1,11 @@
 # backend/app/crud/daily_problems.py
+import uuid # 추가
 from sqlalchemy.orm import Session
 from datetime import date, datetime
 from .. import models, schemas
+
+def get_daily_problem_by_id(db: Session, problem_id: uuid.UUID):
+    return db.query(models.DailyProblem).filter(models.DailyProblem.id == problem_id).first()
 
 def get_daily_problem_by_date(db: Session, problem_date: date):
     return db.query(models.DailyProblem).filter(
