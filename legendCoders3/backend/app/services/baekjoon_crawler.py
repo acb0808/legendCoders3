@@ -2,13 +2,14 @@
 import requests
 from bs4 import BeautifulSoup
 from typing import Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, date, timedelta
 
 BAEKJOON_STATUS_URL = "https://www.acmicpc.net/status"
 
 def get_latest_solved_submission(baekjoon_id: str, problem_id: int) -> Optional[Dict[str, Any]]:
     """
     백준 사용자가 특정 문제를 풀었는지 확인하고, 가장 최근의 '맞았습니다' 제출 정보를 가져옵니다.
+    제공해주신 유틸리티의 result_id=4 필터링 로직을 반영했습니다.
     """
     params = {
         "user_id": baekjoon_id,
@@ -38,23 +39,30 @@ def get_latest_solved_submission(baekjoon_id: str, problem_id: int) -> Optional[
         if len(rows) == 0:
             return None
             
-        # 첫 번째 행(가장 최근 제출) 정보 파싱
+        # 첫 번째 행(가장 최근 성공 제출) 정보 파싱
         first_row = rows[0]
         cols = first_row.find_all("td")
         
         # 백준 컬럼: 제출번호(0), 아이디(1), 문제(2), 결과(3), 메모리(4), 시간(5), 언어(6), 코드길이(7), 제출시간(8)
         submission_id = int(cols[0].get_text(strip=True))
         status_text = cols[3].get_text(strip=True)
-        memory_usage_kb = int(cols[4].get_text(strip=True)) if cols[4].get_text(strip=True).isdigit() else None
-        runtime_ms = int(cols[5].get_text(strip=True)) if cols[5].get_text(strip=True).isdigit() else None
+        
+        # 메모리 및 시간 파싱 (숫자만 추출)
+        memory_text = cols[4].get_text(strip=True)
+        memory_usage_kb = int(memory_text) if memory_text.isdigit() else None
+        
+        runtime_text = cols[5].get_text(strip=True)
+        runtime_ms = int(runtime_text) if runtime_text.isdigit() else None
+        
         language = cols[6].get_text(strip=True)
         
-        # 제출 시간 추출 (a.real-time-update 요소의 title 속성)
+        # 제출 시간 추출 (유틸리티 로직 반영: a.real-time-update의 title 속성)
         time_elem = cols[8].find("a", {"class": "real-time-update"})
         submit_time = None
         if time_elem:
             time_str = time_elem.get("title", "")
             try:
+                # 백준 시간 형식: "2024-01-15 14:30:00"
                 submit_time = datetime.strptime(time_str, "%Y-%m-%d %H:%M:%S")
             except:
                 pass
@@ -70,13 +78,5 @@ def get_latest_solved_submission(baekjoon_id: str, problem_id: int) -> Optional[
         }
         
     except Exception as e:
-        print(f"Baekjoon crawl error: {e}")
+        print(f"Baekjoon crawl error for user {baekjoon_id}, problem {problem_id}: {e}")
         return None
-
-def get_submission_code_from_baekjoon(baekjoon_submission_id: int) -> Optional[str]:
-    """
-    백준 제출 ID로 코드 내용을 크롤링합니다. (백준 로그인이 필요한 경우가 많아 실패할 수 있음)
-    """
-    # 현재는 상세 코드 크롤링은 생략하거나 권한 문제로 실패할 가능성이 큼
-    # 유지보수를 위해 틀만 남겨둠
-    return None

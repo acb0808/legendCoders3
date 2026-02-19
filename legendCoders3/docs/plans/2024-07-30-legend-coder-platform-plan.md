@@ -1379,4 +1379,126 @@ Expected: `backend/app/crud/__init__.py` 파일이 업데이트됩니다.
 git add backend/requirements.txt backend/app/schemas.py backend/app/crud/submissions.py backend/app/services/baekjoon_crawler.py backend/app/routers/submissions.py backend/app/main.py backend/app/crud/__init__.py
 git commit -m "feat: Implement submission result registration and judging via Baekjoon crawling"
 ```
+
+### Task 6: 커뮤니티 및 토론 기능 (Community & Discussion)
+
+**Goal:** 각 문제에 대해 사용자들이 풀이 아이디어를 공유하고 질문할 수 있는 게시글(Post) 및 댓글(Comment) CRUD API를 구현합니다.
+
+**Files:**
+- Create: `backend/app/crud/posts.py`
+- Create: `backend/app/crud/comments.py`
+- Modify: `backend/app/schemas.py` (Pydantic schemas for posts and comments)
+- Create: `backend/app/routers/posts.py`
+- Create: `backend/app/routers/comments.py`
+- Modify: `backend/app/main.py`
+- Modify: `backend/app/crud/__init__.py`
+
+**Step 1: `backend/app/schemas.py` 업데이트 (Post, Comment 스키마 추가)**
+
+`backend/app/schemas.py` 파일의 마지막에 다음 내용을 추가합니다.
+
+```python
+class CommentBase(BaseModel):
+    content: str
+    parent_comment_id: Optional[uuid.UUID] = None
+
+class CommentCreate(CommentBase):
+    post_id: uuid.UUID
+
+class Comment(CommentBase):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    post_id: uuid.UUID
+    like_count: int
+    created_at: datetime
+    updated_at: datetime
+    nickname: Optional[str] = None
+
+    class Config:
+        orm_mode = True
+
+class PostBase(BaseModel):
+    title: str
+    content: str
+    tags: Optional[List[str]] = None
+
+class PostCreate(PostBase):
+    daily_problem_id: uuid.UUID
+
+class Post(PostBase):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    daily_problem_id: uuid.UUID
+    view_count: int
+    like_count: int
+    created_at: datetime
+    updated_at: datetime
+    nickname: Optional[str] = None
+    comments: List[Comment] = []
+
+    class Config:
+        orm_mode = True
+```
+
+**Step 2: `backend/app/crud/posts.py` 및 `comments.py` 생성**
+
+사용자 정의 CRUD 로직을 작성합니다. (게시글 목록 조회 시 닉네임 포함 join 처리 등)
+
+**Step 3: `backend/app/routers/posts.py` 및 `comments.py` 생성**
+
+FastAPI 라우터를 생성하여 API 엔드포인트를 정의합니다.
+
+**Step 4: `backend/app/main.py`에 라우터 등록**
+
+**Step 5: API 테스트 및 커밋**
+
+```bash
+git add ...
+git commit -m "feat: Implement community features (posts and comments)"
+```
+
+### Task 7: 랭킹 및 대시보드 API (Ranking & Dashboard)
+
+**Goal:** 사용자들의 문제 해결 통계를 기반으로 한 랭킹 시스템과 개인별 학습 진행 상황을 보여주는 대시보드 API를 구현합니다.
+
+**Files:**
+- Create: `backend/app/crud/stats.py`
+- Modify: `backend/app/schemas.py` (Pydantic schemas for stats and rankings)
+- Create: `backend/app/routers/stats.py`
+- Modify: `backend/app/main.py`
+- Modify: `backend/app/crud/__init__.py`
+
+**Step 1: `backend/app/schemas.py` 업데이트 (Ranking, Stats 스키마 추가)**
+
+```python
+class UserRanking(BaseModel):
+    user_id: uuid.UUID
+    nickname: str
+    solved_count: int
+    consecutive_days: int
+
+class UserDashboard(BaseModel):
+    total_solved: int
+    streak_days: int
+    solve_history: List[date] # 해결한 날짜 목록 (달력용)
+```
+
+**Step 2: `backend/app/crud/stats.py` 생성**
+
+사용자별 해결 문제 수 계산, 연속 해결 일수(Streak) 계산 로직을 작성합니다.
+
+**Step 3: `backend/app/routers/stats.py` 생성**
+
+`/stats/ranking` 및 `/stats/me` 엔드포인트를 구현합니다.
+
+**Step 4: `backend/app/main.py`에 라우터 등록**
+
+**Step 5: API 테스트 및 커밋**
+
+```bash
+git add ...
+git commit -m "feat: Implement ranking and dashboard statistics API"
+```
+
+
 ```

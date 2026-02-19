@@ -22,8 +22,11 @@ HARDCODED_PROBLEM_IDS_SILVER = [2000, 2001, 2002, 2003, 2004, 2005] # 예시
 
 def get_problem_details_from_baekjoon(problem_id: int):
     url = f"{BAEKJOON_URL}{problem_id}"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    }
     try:
-        response = requests.get(url, timeout=10)
+        response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status() # HTTP 오류 발생 시 예외 발생
     except requests.exceptions.RequestException as e:
         print(f"Error fetching problem {problem_id} from Baekjoon: {e}")
