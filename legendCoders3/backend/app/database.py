@@ -10,7 +10,12 @@ load_dotenv()
 SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL")
 
 engine = create_engine(
-    SQLALCHEMY_DATABASE_URL
+    SQLALCHEMY_DATABASE_URL,
+    pool_size=20,          # Increase base pool size
+    max_overflow=10,       # Allow up to 10 extra connections
+    pool_timeout=30,       # Wait up to 30s for a connection
+    pool_recycle=1800,     # Recycle connections every 30m
+    pool_pre_ping=True,    # Check connection validity before use
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

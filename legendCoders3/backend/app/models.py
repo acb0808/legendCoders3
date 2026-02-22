@@ -15,6 +15,11 @@ class User(Base):
     password_hash = Column(String, nullable=False)
     nickname = Column(String, unique=True, index=True, nullable=False)
     baekjoon_id = Column(String, nullable=False)
+    is_pro = Column(Boolean, default=False)
+    pro_expires_at = Column(DateTime(timezone=True), nullable=True)
+    last_sync_at = Column(DateTime(timezone=True), nullable=True)
+    streak_freeze_count = Column(Integer, default=0) # 스트릭 보호권 개수 추가
+    equipped_title_id = Column(UUID(as_uuid=True), ForeignKey("titles.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
 
@@ -22,6 +27,30 @@ class User(Base):
     posts = relationship("Post", back_populates="user")
     comments = relationship("Comment", back_populates="user")
     achievements = relationship("UserAchievement", back_populates="user")
+    equipped_title = relationship("Title", foreign_keys=[equipped_title_id])
+    unlocked_titles = relationship("UserTitle", back_populates="user")
+
+class Title(Base):
+    __tablename__ = "titles"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String, unique=True, nullable=False)
+    description = Column(Text, nullable=False)
+    color_code = Column(String, default="blue") # Tailwind color name or hex
+    is_pro_only = Column(Boolean, default=False)
+    has_glow = Column(Boolean, default=False)
+    animation_type = Column(String, nullable=True) # None, "pulse", "shimmer"
+    icon = Column(String, nullable=True) # Lucide icon name or emoji
+
+class UserTitle(Base):
+    __tablename__ = "user_titles"
+
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), primary_key=True)
+    title_id = Column(UUID(as_uuid=True), ForeignKey("titles.id"), primary_key=True)
+    unlocked_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    user = relationship("User", back_populates="unlocked_titles")
+    title = relationship("Title")
 
 class DailyProblem(Base):
     __tablename__ = "daily_problems"
@@ -114,10 +143,37 @@ class UserAchievement(Base):
     user = relationship("User", back_populates="achievements")
     achievement = relationship("Achievement")
 
-# UserStats는 User 모델에 통합하거나 별도 테이블로 관리 가능. 여기서는 User 모델 내부에 필드로 추가하는 것으로 간주.
-# 복잡도 관리 및 랭킹 성능을 위해 User 모델에 관련 필드를 직접 추가하는 것을 고려합니다.
-# 예를 들어, User 모델에 total_solved_count, consecutive_days 등을 추가.
-# 또는 UserStats 테이블을 별도로 만들어 user_id와 1대1 관계를 맺을 수 있습니다.
-# 현재 모델에서는 User.submissions 를 통해 통계 계산이 가능하므로 별도 테이블은 우선 생략.
-# 랭킹 시스템 구현 시 효율적인 쿼리를 위해 통계성 필드는 필요에 따라 추가될 수 있음.
+class Arena(Base):
+    __tablename__ = "arenas"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    host_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    guest_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    baekjoon_problem_id = Column(Integer, nullable=True) # 대결 문제 (시작 시 확정)
+    
+    status = Column(String, default="WAITING") # WAITING, PLAYING, FINISHED, CANCELLED
+    difficulty = Column(String, nullable=False) # BRONZE, SILVER, GOLD, PLATINUM, DIAMOND, RANDOM
+
+    host_ready = Column(Boolean, default=False)
+    guest_ready = Column(Boolean, default=False)
+    host_surrender = Column(Boolean, default=False)
+    guest_surrender = Column(Boolean, default=False)
+    
+    host_draw_agreed = Column(Boolean, default=False)
+    guest_draw_agreed = Column(Boolean, default=False)
+    host_skip_agreed = Column(Boolean, default=False)
+    guest_skip_agreed = Column(Boolean, default=False)
+    
+    draw_agreed = Column(Boolean, default=False) # Legacy/Combined flag
+    skip_agreed = Column(Boolean, default=False) # Legacy/Combined flag
+    
+    start_time = Column(DateTime(timezone=True), nullable=True)
+    end_time = Column(DateTime(timezone=True), nullable=True)
+    winner_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    host = relationship("User", foreign_keys=[host_id])
+    guest = relationship("User", foreign_keys=[guest_id])
+    winner = relationship("User", foreign_keys=[winner_id])
 

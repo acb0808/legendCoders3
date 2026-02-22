@@ -13,7 +13,8 @@ import {
   Send, 
   Loader2,
   Trash2,
-  CornerDownRight
+  CornerDownRight,
+  X
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -46,12 +47,13 @@ export default function PostDetailPage({ params }: { params: Promise<{ id: strin
   
   const [post, setPost] = useState<Post | null>(null);
   const [commentContent, setCommentContent] = useState('');
+  const [replyTo, setReplyTo] = useState<Comment | null>(null); // 답글 대상 상태
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchPost = async () => {
     try {
-      const response = await api.get(`/posts/${postId}`);
+      const response = await api.get(`/posts/${postId}?t=${Date.now()}`);
       setPost(response.data);
     } catch (error) {
       console.error('Failed to fetch post:', error);
@@ -81,10 +83,12 @@ export default function PostDetailPage({ params }: { params: Promise<{ id: strin
     try {
       await api.post('/comments/', {
         post_id: postId,
-        content: commentContent
+        content: commentContent,
+        parent_comment_id: replyTo?.id || null // 답글인 경우 부모 ID 전송
       });
       setCommentContent('');
-      await fetchPost(); // 댓글 목록 갱신
+      setReplyTo(null);
+      await fetchPost();
     } catch (error) {
       console.error('Failed to submit comment:', error);
     } finally {
@@ -100,6 +104,90 @@ export default function PostDetailPage({ params }: { params: Promise<{ id: strin
     } catch (error) {
       alert('게시글 삭제에 실패했습니다.');
     }
+  };
+
+  const handleDeleteComment = async (commentId: string) => {
+    if (!window.confirm('댓글을 삭제하시겠습니까?')) return;
+    try {
+      await api.delete(`/comments/${commentId}`);
+      await fetchPost();
+    } catch (error) {
+      alert('댓글 삭제에 실패했습니다.');
+    }
+  };
+
+  // 댓글 계층 구조화 로직
+  const renderComments = () => {
+    if (!post) return null;
+    
+    const parentComments = post.comments.filter(c => !c.parent_comment_id);
+    const childComments = post.comments.filter(c => c.parent_comment_id);
+
+    return parentComments.map(parent => (
+      <div key={parent.id} className="space-y-4">
+        {/* 부모 댓글 */}
+        <div className="bg-white p-6 rounded-[1.5rem] border border-gray-100 shadow-sm transition-all hover:shadow-md">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center font-bold text-gray-500 text-xs uppercase">
+                {parent.nickname.charAt(0)}
+              </div>
+              <span className="font-bold text-gray-900 text-sm">{parent.nickname}</span>
+              <span className="text-[10px] font-bold text-gray-300 uppercase tracking-widest ml-2">
+                {new Date(parent.created_at).toLocaleDateString()}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => {
+                  setReplyTo(parent);
+                  window.scrollTo({ top: document.getElementById('comment-form')?.offsetTop ? document.getElementById('comment-form')!.offsetTop - 100 : 0, behavior: 'smooth' });
+                }}
+                className="text-xs font-bold text-blue-500 hover:text-blue-700"
+              >
+                답글
+              </button>
+              {user?.id === parent.user_id && (
+                <button onClick={() => handleDeleteComment(parent.id)} className="text-gray-300 hover:text-red-500">
+                  <Trash2 size={14} />
+                </button>
+              )}
+            </div>
+          </div>
+          <div className="text-gray-600 text-sm font-medium leading-relaxed whitespace-pre-wrap">
+            {parent.content}
+          </div>
+        </div>
+
+        {/* 자식 댓글 (대댓글) */}
+        {childComments.filter(child => child.parent_comment_id === parent.id).map(child => (
+          <div key={child.id} className="ml-10 flex gap-3">
+            <CornerDownRight className="text-gray-200 mt-2 shrink-0" size={20} />
+            <div className="flex-grow bg-gray-50/50 p-5 rounded-[1.5rem] border border-gray-100 shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 bg-white rounded-full flex items-center justify-center font-bold text-gray-400 text-[10px] uppercase border border-gray-100">
+                    {child.nickname.charAt(0)}
+                  </div>
+                  <span className="font-bold text-gray-800 text-xs">{child.nickname}</span>
+                  <span className="text-[9px] font-bold text-gray-300 uppercase tracking-widest ml-1">
+                    {new Date(child.created_at).toLocaleDateString()}
+                  </span>
+                </div>
+                {user?.id === child.user_id && (
+                  <button onClick={() => handleDeleteComment(child.id)} className="text-gray-300 hover:text-red-500">
+                    <Trash2 size={12} />
+                  </button>
+                )}
+              </div>
+              <div className="text-gray-600 text-sm font-medium whitespace-pre-wrap">
+                {child.content}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    ));
   };
 
   if (loading || isLoading) {
@@ -177,44 +265,40 @@ export default function PostDetailPage({ params }: { params: Promise<{ id: strin
       <section className="space-y-8 pb-20">
         <h2 className="text-2xl font-black text-gray-900 px-2 tracking-tight uppercase">Discussion</h2>
         
-        {/* Comment Input */}
-        <form onSubmit={handleCommentSubmit} className="relative group">
-          <textarea
-            value={commentContent}
-            onChange={(e) => setCommentContent(e.target.value)}
-            placeholder="생각을 공유해주세요..."
-            className="w-full min-h-[120px] p-6 rounded-3xl bg-white border border-gray-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-50 focus:outline-none transition-all font-medium text-gray-700 shadow-sm"
-          />
-          <button
-            type="submit"
-            disabled={isSubmitting || !commentContent.trim()}
-            className="absolute bottom-4 right-4 bg-blue-600 text-white p-3 rounded-2xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 disabled:opacity-50 active:scale-95"
-          >
-            {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : <Send size={20} />}
-          </button>
-        </form>
-
-        {/* Comment List */}
-        <div className="space-y-4">
-          {post.comments.length > 0 ? (
-            post.comments.map((comment) => (
-              <div key={comment.id} className="bg-white p-6 rounded-[1.5rem] border border-gray-100 shadow-sm transition-all hover:shadow-md">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center font-bold text-gray-500 text-xs uppercase">
-                      {comment.nickname.charAt(0)}
-                    </div>
-                    <span className="font-bold text-gray-900 text-sm">{comment.nickname}</span>
-                    <span className="text-[10px] font-bold text-gray-300 uppercase tracking-widest ml-2">
-                      {new Date(comment.created_at).toLocaleDateString()}
-                    </span>
-                  </div>
-                </div>
-                <div className="text-gray-600 text-sm font-medium leading-relaxed">
-                  {comment.content}
-                </div>
+        {/* Comment/Reply Input */}
+        <div id="comment-form" className="relative group">
+          {replyTo && (
+            <div className="absolute -top-10 left-0 right-0 flex items-center justify-between bg-blue-50 px-4 py-2 rounded-t-2xl text-xs font-bold text-blue-600 border-x border-t border-blue-100">
+              <div className="flex items-center gap-2">
+                <CornerDownRight size={14} />
+                <span>{replyTo.nickname}님에게 답글 남기는 중...</span>
               </div>
-            ))
+              <button onClick={() => setReplyTo(null)} className="hover:text-blue-800">
+                <X size={14} />
+              </button>
+            </div>
+          )}
+          <form onSubmit={handleCommentSubmit}>
+            <textarea
+              value={commentContent}
+              onChange={(e) => setCommentContent(e.target.value)}
+              placeholder={replyTo ? "답글을 입력하세요..." : "생각을 공유해주세요..."}
+              className={`w-full min-h-[120px] p-6 bg-white border border-gray-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-50 focus:outline-none transition-all font-medium text-gray-700 shadow-sm ${replyTo ? 'rounded-b-3xl rounded-tr-3xl' : 'rounded-3xl'}`}
+            />
+            <button
+              type="submit"
+              disabled={isSubmitting || !commentContent.trim()}
+              className="absolute bottom-4 right-4 bg-blue-600 text-white p-3 rounded-2xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 disabled:opacity-50 active:scale-95"
+            >
+              {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : <Send size={20} />}
+            </button>
+          </form>
+        </div>
+
+        {/* Structured Comment List */}
+        <div className="space-y-8">
+          {post.comments.length > 0 ? (
+            renderComments()
           ) : (
             <div className="text-center py-10 text-gray-400 font-medium italic">
               첫 번째 의견을 남겨주세요!

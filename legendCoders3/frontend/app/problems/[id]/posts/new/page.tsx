@@ -48,6 +48,7 @@ export default function NewPostPage({ params }: { params: Promise<{ id: string }
         tags
       });
       router.push(`/problems/${problemId}/posts`);
+      router.refresh(); // 라우트 캐시 강제 갱신
     } catch (err: any) {
       setError(err.response?.data?.detail || '게시글 저장에 실패했습니다.');
       setIsSubmitting(false);

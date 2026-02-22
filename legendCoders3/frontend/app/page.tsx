@@ -17,7 +17,7 @@ export default function LandingPage() {
             <div className="mx-auto max-w-2xl text-center">
               <div className="mb-8 flex justify-center">
                 <div className="relative rounded-full px-3 py-1 text-sm leading-6 text-gray-600 ring-1 ring-gray-900/10 hover:ring-gray-900/20">
-                  레전드 코더 2기 모집 중!{' '}
+                  레전드 코더 2기 모집 중{' '}
                   <Link href="/register" className="font-semibold text-blue-600">
                     <span className="absolute inset-0" aria-hidden="true" />
                     더 알아보기 <span aria-hidden="true">&rarr;</span>
@@ -29,7 +29,7 @@ export default function LandingPage() {
                 <span className="text-blue-600">One Problem.</span>
               </h1>
               <p className="mt-6 text-lg leading-8 text-gray-600 font-medium">
-                AI가 엄선하는 오늘의 백준 문제를 매일 하나씩 풀고 <br />
+                AI가 엄선하는 오늘의 백준 문제를 매일 하나씩 풀고<br />
                 함께 성장하는 개발자들의 커뮤니티, 레전드 코더입니다.
               </p>
               <div className="mt-10 flex items-center justify-center gap-x-6">
@@ -40,7 +40,7 @@ export default function LandingPage() {
                   시작하기
                 </Link>
                 <Link href="/login" className="text-sm font-black leading-6 text-gray-900 uppercase tracking-tighter">
-                  로그인 <span aria-hidden="true">→</span>
+                  로그인 <span aria-hidden="true">&rarr;</span>
                 </Link>
               </div>
             </div>
@@ -89,7 +89,7 @@ export default function LandingPage() {
                   Community
                 </dt>
                 <dd className="mt-4 flex flex-auto flex-col text-base leading-7 text-gray-600 font-medium">
-                  <p className="flex-auto">해결하지 못한 문제에 대해 힌트를 얻거나, 자신만의 기발한 풀이 방식을 공유하며 동료들과 함께 성장하세요.</p>
+                  <p className="flex-auto">해결하지 못한 문제에 대한 힌트를 얻거나, 자신만의 기발한 풀이 방식을 공유하며 동료들과 함께 성장하세요.</p>
                 </dd>
               </div>
             </dl>

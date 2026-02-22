@@ -5,12 +5,20 @@ import { useAuth } from '@/components/auth-provider';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
 import { Trophy, Medal, Flame, Hash, User } from 'lucide-react';
+import TitleBadge from '@/components/title-badge';
 
 interface RankingUser {
   user_id: string;
   nickname: string;
   solved_count: number;
   consecutive_days: number;
+  equipped_title?: {
+    name: string;
+    color_code: string;
+    has_glow?: boolean;
+    animation_type?: string | null;
+    icon?: string | null;
+  } | null;
 }
 
 export default function RankingPage() {
@@ -98,9 +106,13 @@ export default function RankingPage() {
                         {rk.nickname.charAt(0).toUpperCase()}
                       </div>
                       <div>
-                        <p className={`font-bold ${isMe ? 'text-blue-700' : 'text-gray-900'}`}>
-                          {rk.nickname} {isMe && <span className="text-[10px] bg-blue-100 px-1.5 py-0.5 rounded ml-1 uppercase">Me</span>}
-                        </p>
+                        <div className="flex items-center gap-1.5 mb-0.5">
+                          <TitleBadge title={rk.equipped_title} size="xs" />
+                          <p className={`font-bold ${isMe ? 'text-blue-700' : 'text-gray-900'}`}>
+                            {rk.nickname}
+                          </p>
+                          {isMe && <span className="text-[8px] font-black bg-blue-100 text-blue-600 px-1 py-0.5 rounded uppercase">Me</span>}
+                        </div>
                       </div>
                     </div>
                   </td>

@@ -4,9 +4,14 @@ from sqlalchemy.orm import Session
 from .. import models, schemas
 from datetime import datetime
 
+from sqlalchemy import desc # desc 임포트 추가
+
 def get_posts_by_problem(db: Session, daily_problem_id: uuid.UUID):
-    # User와 join하여 닉네임 정보를 함께 가져옴
-    return db.query(models.Post).filter(models.Post.daily_problem_id == daily_problem_id).all()
+    # 최신순으로 정렬하여 반환
+    return db.query(models.Post)\
+             .filter(models.Post.daily_problem_id == daily_problem_id)\
+             .order_by(desc(models.Post.created_at))\
+             .all()
 
 def get_post(db: Session, post_id: uuid.UUID):
     return db.query(models.Post).filter(models.Post.id == post_id).first()

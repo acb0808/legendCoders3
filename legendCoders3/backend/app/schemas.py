@@ -1,4 +1,5 @@
 # backend/schemas.py
+from __future__ import annotations
 from pydantic import BaseModel, EmailStr
 from typing import List, Optional
 from datetime import datetime, date
@@ -7,27 +8,50 @@ import uuid
 class UserBase(BaseModel):
     email: EmailStr
     nickname: str
-    baekjoon_id: str
+    baekjoon_id: Optional[str] = None # Changed to Optional
+    is_pro: bool = False
+    pro_expires_at: Optional[datetime] = None
+    last_sync_at: Optional[datetime] = None
+    streak_freeze_count: int = 0
+    equipped_title_id: Optional[uuid.UUID] = None
+
+class TitleBase(BaseModel):
+    name: str
+    description: str
+    color_code: str = "blue"
+    is_pro_only: bool = False
+    has_glow: bool = False
+    animation_type: Optional[str] = None
+    icon: Optional[str] = None
+
+class Title(TitleBase):
+    id: uuid.UUID
+
+    class Config:
+        from_attributes = True
 
 class UserCreate(UserBase):
     password: str
 
-class UserUpdate(UserBase):
-    password: Optional[str] = None
-    email: Optional[EmailStr] = None
+class UserUpdate(BaseModel):
     nickname: Optional[str] = None
     baekjoon_id: Optional[str] = None
+    password: Optional[str] = None
+    is_pro: Optional[bool] = None
+    streak_freeze_count: Optional[int] = None
 
 class User(UserBase):
     id: uuid.UUID
     created_at: datetime
     updated_at: datetime
+    equipped_title: Optional[Title] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class Token(BaseModel):
     access_token: str
+    refresh_token: str # 리프레시 토큰 추가
     token_type: str
 
 class TokenData(BaseModel):
@@ -55,7 +79,7 @@ class DailyProblem(DailyProblemBase):
     created_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class SubmissionBase(BaseModel):
     daily_problem_id: uuid.UUID
@@ -77,7 +101,7 @@ class Submission(SubmissionBase):
     baekjoon_problem_id: int # Submission 모델에 baekjoon_problem_id 추가 (편의상)
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class SubmissionRegisterRequest(BaseModel):
     daily_problem_id: uuid.UUID
@@ -100,7 +124,7 @@ class Comment(CommentBase):
     nickname: Optional[str] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class PostBase(BaseModel):
     title: str
@@ -122,15 +146,53 @@ class Post(PostBase):
     comments: List[Comment] = []
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class UserRanking(BaseModel):
     user_id: uuid.UUID
     nickname: str
     solved_count: int
     consecutive_days: int
+    equipped_title: Optional[Title] = None
+
+    class Config:
+        from_attributes = True
 
 class UserDashboard(BaseModel):
     total_solved: int
     streak_days: int
     solve_history: List[date]
+
+# Arena Schemas
+class ArenaCreate(BaseModel):
+    difficulty: str  # BRONZE, SILVER, GOLD, PLATINUM, DIAMOND, RANDOM
+    mode: str = "OPEN" # OPEN, PRIVATE
+
+class ArenaResponse(BaseModel):
+    id: uuid.UUID
+    host_id: uuid.UUID
+    guest_id: Optional[uuid.UUID] = None
+    baekjoon_problem_id: Optional[int] = None
+    status: str
+    difficulty: str
+    host_ready: bool = False
+    guest_ready: bool = False
+    host_surrender: bool = False
+    guest_surrender: bool = False
+    host_draw_agreed: bool = False
+    guest_draw_agreed: bool = False
+    host_skip_agreed: bool = False
+    guest_skip_agreed: bool = False
+    draw_agreed: bool = False
+    skip_agreed: bool = False
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+    winner_id: Optional[uuid.UUID] = None
+    created_at: datetime
+    
+    host: Optional['User'] = None
+    guest: Optional['User'] = None
+    winner: Optional['User'] = None
+
+    class Config:
+        from_attributes = True

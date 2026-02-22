@@ -53,9 +53,10 @@ export default function ProblemPostsPage({ params }: { params: Promise<{ id: str
   useEffect(() => {
     const fetchData = async () => {
       try {
+        setIsLoading(true);
         const [postsRes, problemRes] = await Promise.all([
-          api.get(`/posts/problem/${problemId}`),
-          api.get(`/daily-problems/${problemId}`) // UUID로 조회하는 엔드포인트가 있다고 가정
+          api.get(`/posts/problem/${problemId}?t=${Date.now()}`),
+          api.get(`/daily-problems/id/${problemId}`) // id prefix 추가
         ]);
         setPosts(postsRes.data);
         setProblemTitle(problemRes.data.title);
