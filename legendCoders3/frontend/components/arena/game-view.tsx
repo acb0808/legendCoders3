@@ -31,7 +31,6 @@ export const GameView: React.FC<GameViewProps> = ({
   const handleVerifySubmission = async () => {
     setIsChecking(true);
     try {
-      console.log("[Arena] Verifying submission for problem:", problemId);
       const res = await arenaApi.checkSubmission(arena.id);
       if (res.success) {
         toast.success(res.message);
@@ -39,7 +38,6 @@ export const GameView: React.FC<GameViewProps> = ({
         toast.error(res.message);
       }
     } catch (err: any) {
-      console.error("[Arena] Submission check failed:", err);
       toast.error(err.response?.data?.detail || "제출 확인 중 오류가 발생했습니다.");
     } finally {
       setIsChecking(false);
@@ -71,7 +69,7 @@ export const GameView: React.FC<GameViewProps> = ({
                 <div className="absolute inset-0 bg-white/10 -translate-x-full group-hover:translate-x-0 transition-transform duration-500" />
                 <span className="relative flex items-center gap-3">
                   {isChecking ? <Loader2 className="animate-spin" /> : <CheckCircle2 />}
-                  {isChecking ? 'Verifying...' : 'Submit & Verify Result'}
+                  {isChecking ? '검증 중...' : '코드 제출 및 검증'}
                 </span>
               </Button>
             </div>
@@ -98,7 +96,7 @@ export const GameView: React.FC<GameViewProps> = ({
                 : 'border-white/10 text-slate-400 hover:bg-white/5 hover:text-white'
             }`}
           >
-            {opponentDrawAgreed ? 'Accept Draw' : myDrawAgreed ? 'Draw Proposed' : 'Draw'}
+            {opponentDrawAgreed ? '무승부 수락' : myDrawAgreed ? '무승부 제안됨' : '무승부 제안'}
           </Button>
           <Button
             onClick={onProposeSkip}
@@ -112,14 +110,14 @@ export const GameView: React.FC<GameViewProps> = ({
                 : 'border-white/10 text-slate-400 hover:bg-white/5 hover:text-white'
             }`}
           >
-            {opponentSkipAgreed ? 'Accept Skip' : mySkipAgreed ? 'Skip Proposed' : 'Skip'}
+            {opponentSkipAgreed ? '변경 수락' : mySkipAgreed ? '변경 제안됨' : '문제 변경'}
           </Button>
         </div>
 
         <div className="flex-grow flex justify-center px-12">
           {(myDrawAgreed || opponentDrawAgreed || mySkipAgreed || opponentSkipAgreed) && (
             <div className="px-6 py-3 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-400 text-[10px] font-black uppercase tracking-[0.2em] animate-pulse">
-              {myDrawAgreed || opponentDrawAgreed ? 'Draw Vote Active' : 'Skip Vote Active'} - Waiting for response
+              {myDrawAgreed || opponentDrawAgreed ? '무승부 투표 진행 중' : '문제 변경 투표 진행 중'} - 상대방 응답 대기
             </div>
           )}
         </div>
@@ -128,7 +126,7 @@ export const GameView: React.FC<GameViewProps> = ({
           onClick={onSurrender}
           className="px-8 py-6 bg-rose-600 hover:bg-rose-500 text-white rounded-2xl font-black uppercase tracking-widest shadow-[0_0_20px_rgba(225,29,72,0.2)] transition-all active:scale-95"
         >
-          Surrender
+          항복하기
         </Button>
       </div>
     </div>

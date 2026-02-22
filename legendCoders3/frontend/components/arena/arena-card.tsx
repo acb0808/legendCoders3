@@ -24,7 +24,7 @@ function formatTime(dateStr: string) {
     if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}시간 전`;
     return `${Math.floor(diffInSeconds / 86400)}일 전`;
   } catch (e) {
-    return 'Just now';
+    return '방금 전';
   }
 }
 
@@ -38,13 +38,11 @@ export default function ArenaCard({ arena }: { arena: ArenaResponse }) {
       href={`/arena/${arena.id}`}
       className={`group relative overflow-hidden rounded-3xl border border-white/5 bg-slate-900/40 backdrop-blur-xl hover:bg-slate-800/60 transition-all duration-500 hover:border-rose-500/30 hover:shadow-2xl ${style.glow} block`}
     >
-      {/* Background Decorative Element */}
       <div className="absolute -right-4 -top-4 opacity-[0.03] group-hover:opacity-[0.07] transition-opacity rotate-12 group-hover:rotate-0 duration-700">
         <Swords size={120} />
       </div>
       
       <div className="relative p-6 flex flex-col gap-6">
-        {/* Header */}
         <div className="flex justify-between items-center">
           <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${style.color}`}>
             {arena.difficulty}
@@ -55,7 +53,6 @@ export default function ArenaCard({ arena }: { arena: ArenaResponse }) {
           </div>
         </div>
 
-        {/* Player Matchup */}
         <div className="flex items-center justify-between gap-4">
           <div className="flex flex-col items-center gap-2 flex-1">
             <div className={`w-12 h-12 rounded-2xl bg-slate-800 flex items-center justify-center border-2 transition-transform duration-500 group-hover:rotate-3 ${isPro ? 'border-amber-500/50' : 'border-slate-700'}`}>
@@ -73,19 +70,18 @@ export default function ArenaCard({ arena }: { arena: ArenaResponse }) {
             <div className="w-12 h-12 rounded-2xl bg-slate-900 border-2 border-dashed border-slate-700 flex items-center justify-center">
               <UserIcon size={20} className="text-slate-600" />
             </div>
-            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest italic">Waiting</span>
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest italic">대기 중</span>
           </div>
         </div>
 
-        {/* Footer Action */}
         <div className="pt-4 border-t border-white/5">
           <div className="flex items-center justify-between">
             <div className="flex flex-col">
               <span className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em]">Match Type</span>
-              <span className="text-[10px] font-bold text-slate-300">Public Battle</span>
+              <span className="text-[10px] font-bold text-slate-300">공개 대전</span>
             </div>
             <div className="px-4 py-2 bg-rose-600 group-hover:bg-rose-500 text-white rounded-xl text-[10px] font-black uppercase tracking-tighter flex items-center gap-2 transition-colors shadow-lg shadow-rose-950/20">
-              Enter Arena <Swords size={12} />
+              아레나 입장 <Swords size={12} />
             </div>
           </div>
         </div>

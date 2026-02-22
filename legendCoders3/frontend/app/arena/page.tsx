@@ -144,7 +144,7 @@ export default function ArenaLobby() {
 
       {/* Modal */}
       {showCreateModal && (
-        <CreateArenaModal onClose={() => setShowCreateModal(false)} />
+        <CreateArenaModal isOpen={true} onClose={() => setShowCreateModal(false)} />
       )}
     </div>
   );

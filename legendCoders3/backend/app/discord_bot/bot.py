@@ -219,6 +219,28 @@ async def update_daily_problem_embed(problem):
         config['daily_problem_message_id'] = message.id
         save_config(config)
 
+async def notify_new_arena(arena):
+    try:
+        config = load_config()
+        channel_id = config.get('channel_2')
+        if not channel_id: return
+        channel = client.get_channel(channel_id)
+        if not channel: return
+
+        # 호스트 닉네임 가져오기 (DB 세션을 새로 열어야 할 수도 있음, 또는 arena 객체에 이미 로딩되어 있어야 함)
+        # 여기서는 arena 객체가 이미 joinedload 되어 있다고 가정하거나, ID만 있으면 DB 조회
+        
+        # 간단하게 메시지 구성
+        msg = (
+            f"⚔️ **새로운 아레나 대결이 열렸습니다!**\n"
+            f"- 난이도: **{arena.difficulty}**\n"
+            f"- 모드: **공개 대전**\n"
+            f"- [참가하기](http://localhost:3000/arena/{arena.id})"
+        )
+        await channel.send(msg)
+    except Exception as e:
+        print(f"Failed to send arena notification: {e}")
+
 @client.event
 async def on_message(message):
     if message.author == client.user: return

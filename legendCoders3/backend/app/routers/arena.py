@@ -1,5 +1,6 @@
 # backend/routers/arena.py
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
+from ..discord_bot.bot import notify_new_arena
 from fastapi.encoders import jsonable_encoder 
 import json # Added this
 import uuid
@@ -87,6 +88,7 @@ async def websocket_endpoint(
 @router.post("/", response_model=schemas.ArenaResponse)
 def create_arena(
     arena: schemas.ArenaCreate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
 ):
@@ -102,6 +104,11 @@ def create_arena(
     created_arena = crud.arena.create_arena(db, arena, current_user.id)
     # Eager load relationships for response model
     db.refresh(created_arena, attribute_names=['host'])
+    
+    # Notify Discord if public
+    if created_arena.mode == "OPEN":
+        background_tasks.add_task(notify_new_arena, created_arena)
+        
     return created_arena
 
 @router.get("/", response_model=List[schemas.ArenaResponse])
@@ -112,7 +119,8 @@ def get_open_arenas(
 ):
     arenas = db.query(models.Arena).options(joinedload(models.Arena.host), joinedload(models.Arena.guest)).filter(
         models.Arena.status == "WAITING",
-        models.Arena.guest_id == None
+        models.Arena.guest_id == None,
+        models.Arena.mode == "OPEN" # Only list OPEN arenas
     ).order_by(models.Arena.created_at.desc()).offset(skip).limit(limit).all()
     return arenas
 

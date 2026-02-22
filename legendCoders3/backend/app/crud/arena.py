@@ -12,6 +12,7 @@ def create_arena(db: Session, arena: schemas.ArenaCreate, host_id: uuid.UUID):
     db_arena = models.Arena(
         host_id=host_id,
         difficulty=arena.difficulty,
+        mode=arena.mode, # Added mode
         status="WAITING",
         created_at=get_kst_now()
     )

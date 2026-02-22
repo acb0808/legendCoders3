@@ -1,122 +1,133 @@
-﻿// frontend/components/arena/create-arena-modal.tsx
 'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 import { arenaApi } from '@/lib/api';
-import { Trophy, Swords, X } from 'lucide-react';
+import { toast } from 'sonner';
+import { Swords, Lock, Globe, Zap, Shield, Crown, Star } from 'lucide-react';
 
 interface CreateArenaModalProps {
+  isOpen: boolean;
   onClose: () => void;
 }
 
 const DIFFICULTIES = [
-  { id: 'BRONZE', label: 'Bronze', color: 'bg-orange-900/50 border-orange-700 text-orange-200' },
-  { id: 'SILVER', label: 'Silver', color: 'bg-slate-400/30 border-slate-400 text-slate-100' },
-  { id: 'GOLD', label: 'Gold', color: 'bg-yellow-600/30 border-yellow-500 text-yellow-200' },
-  { id: 'PLATINUM', label: 'Platinum', color: 'bg-cyan-600/30 border-cyan-400 text-cyan-200' },
-  { id: 'DIAMOND', label: 'Diamond', color: 'bg-blue-600/30 border-blue-400 text-blue-200' },
-  { id: 'RANDOM', label: 'Random', color: 'bg-purple-600/30 border-purple-400 text-purple-200' },
+  { id: 'BRONZE', label: 'Bronze', color: 'text-orange-500', bg: 'bg-orange-500/10', border: 'border-orange-500/50', icon: Shield },
+  { id: 'SILVER', label: 'Silver', color: 'text-slate-400', bg: 'bg-slate-400/10', border: 'border-slate-400/50', icon: Shield },
+  { id: 'GOLD', label: 'Gold', color: 'text-yellow-500', bg: 'bg-yellow-500/10', border: 'border-yellow-500/50', icon: Star },
+  { id: 'PLATINUM', label: 'Platinum', color: 'text-cyan-500', bg: 'bg-cyan-500/10', border: 'border-cyan-500/50', icon: Zap },
+  { id: 'DIAMOND', label: 'Diamond', color: 'text-blue-500', bg: 'bg-blue-500/10', border: 'border-blue-500/50', icon: Crown },
+  { id: 'RANDOM', label: 'Random', color: 'text-purple-500', bg: 'bg-purple-500/10', border: 'border-purple-500/50', icon: Swords },
 ];
 
-export default function CreateArenaModal({ onClose }: CreateArenaModalProps) {
+export default function CreateArenaModal({ isOpen, onClose }: CreateArenaModalProps) {
   const router = useRouter();
-  const [selectedDifficulty, setSelectedDifficulty] = useState('GOLD');
+  const [difficulty, setDifficulty] = useState('SILVER');
+  const [mode, setMode] = useState('OPEN');
   const [loading, setLoading] = useState(false);
 
   const handleCreate = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const data = await arenaApi.createArena(selectedDifficulty, "OPEN");
-      router.push(`/arena/${data.id}`);
+      const arena = await arenaApi.createArena(difficulty, mode);
+      toast.success('아레나가 생성되었습니다!');
+      router.push(`/arena/${arena.id}`);
     } catch (error) {
-      console.error("Failed to create arena:", error);
-      alert("Failed to create arena. Please try again.");
+      toast.error('아레나 생성 실패');
     } finally {
       setLoading(false);
+      onClose();
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-      <div className="w-full max-w-md bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="bg-[#0f172a] border-slate-800 text-white sm:max-w-[600px] p-0 overflow-hidden gap-0">
+        <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 via-transparent to-rose-500/5 pointer-events-none" />
         
-        {/* Header */}
-        <div className="relative p-6 border-b border-slate-800 bg-gradient-to-r from-slate-900 to-slate-800">
-          <button 
-            onClick={onClose}
-            className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors"
-          >
-            <X size={20} />
-          </button>
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-rose-500/20 rounded-lg">
-              <Swords className="w-6 h-6 text-rose-500" />
-            </div>
-            <div>
-              <h2 className="text-xl font-bold text-white">Create Arena</h2>
-              <p className="text-sm text-slate-400">Choose your battle difficulty</p>
+        <DialogHeader className="p-6 pb-4 relative z-10">
+          <DialogTitle className="text-2xl font-black uppercase tracking-tight flex items-center gap-2">
+            <Swords className="text-rose-500" /> 아레나 생성
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="p-6 pt-0 space-y-8 relative z-10">
+          {/* Difficulty Section */}
+          <div className="space-y-3">
+            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">난이도 선택</label>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {DIFFICULTIES.map((diff) => {
+                const Icon = diff.icon;
+                const isSelected = difficulty === diff.id;
+                return (
+                  <button
+                    key={diff.id}
+                    onClick={() => setDifficulty(diff.id)}
+                    className={`relative p-4 rounded-xl border flex flex-col items-center justify-center gap-2 transition-all duration-300 group ${
+                      isSelected 
+                        ? `${diff.bg} ${diff.border} ring-1 ring-offset-0` 
+                        : 'bg-slate-900/50 border-slate-800 hover:bg-slate-800 hover:border-slate-600'
+                    }`}
+                  >
+                    <Icon 
+                      size={24} 
+                      className={`transition-colors duration-300 ${isSelected ? diff.color : 'text-slate-600 group-hover:text-slate-400'}`} 
+                    />
+                    <div className={`font-bold text-sm tracking-wide ${isSelected ? 'text-white' : 'text-slate-500 group-hover:text-slate-300'}`}>
+                      {diff.label}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
-        </div>
 
-        {/* Body */}
-        <div className="p-6 space-y-6">
-          <div className="grid grid-cols-2 gap-3">
-            {DIFFICULTIES.map((diff) => (
+          {/* Mode Section */}
+          <div className="space-y-3">
+            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest">공개 설정</label>
+            <div className="grid grid-cols-2 gap-3">
               <button
-                key={diff.id}
-                onClick={() => setSelectedDifficulty(diff.id)}
-                className={`
-                  relative p-4 rounded-xl border-2 transition-all duration-200
-                  flex flex-col items-center justify-center gap-2 group
-                  ${selectedDifficulty === diff.id 
-                    ? diff.color + ' shadow-[0_0_20px_-5px_currentColor]' 
-                    : 'bg-slate-800/50 border-slate-700 hover:border-slate-500 text-slate-400'}
-                `}
+                onClick={() => setMode('OPEN')}
+                className={`p-4 rounded-xl border flex items-center justify-center gap-3 transition-all h-16 ${
+                  mode === 'OPEN' 
+                    ? 'bg-blue-500/10 border-blue-500/50 text-blue-400' 
+                    : 'bg-slate-900/50 border-slate-800 text-slate-500 hover:bg-slate-800'
+                }`}
               >
-                <span className="font-bold tracking-wide">{diff.label}</span>
-                {selectedDifficulty === diff.id && (
-                  <div className="absolute inset-0 bg-white/5 animate-pulse rounded-xl" />
-                )}
+                <Globe size={20} />
+                <span className="text-sm font-bold">공개 대전</span>
               </button>
-            ))}
-          </div>
-
-          <div className="bg-slate-800/50 p-4 rounded-lg border border-slate-700">
-            <h3 className="text-sm font-semibold text-slate-300 mb-2 flex items-center gap-2">
-              <Trophy size={14} className="text-yellow-500" />
-              Match Rules
-            </h3>
-            <ul className="text-xs text-slate-400 space-y-1 list-disc list-inside">
-              <li>1vs1 Real-time Battle</li>
-              <li>First to solve wins instantly</li>
-              <li>Both players must not have solved the problem before</li>
-            </ul>
+              <button
+                onClick={() => setMode('PRIVATE')}
+                className={`p-4 rounded-xl border flex items-center justify-center gap-3 transition-all h-16 ${
+                  mode === 'PRIVATE' 
+                    ? 'bg-amber-500/10 border-amber-500/50 text-amber-400' 
+                    : 'bg-slate-900/50 border-slate-800 text-slate-500 hover:bg-slate-800'
+                }`}
+              >
+                <Lock size={20} />
+                <span className="text-sm font-bold">비공개 대전</span>
+              </button>
+            </div>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="p-6 pt-0">
-          <button
-            onClick={handleCreate}
+        <div className="p-6 pt-0 flex justify-end gap-3 relative z-10">
+          <Button variant="ghost" onClick={onClose} className="text-slate-400 hover:text-white hover:bg-white/5">
+            취소
+          </Button>
+          <Button 
+            onClick={handleCreate} 
             disabled={loading}
-            className="w-full py-4 bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-500 hover:to-rose-400 text-white font-bold rounded-xl shadow-lg shadow-rose-900/20 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="bg-rose-600 hover:bg-rose-500 text-white font-bold px-8 shadow-lg shadow-rose-900/20"
           >
-            {loading ? (
-              <>
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Creating...
-              </>
-            ) : (
-              <>
-                <Swords size={20} />
-                Start Battle
-              </>
-            )}
-          </button>
+            {loading ? '생성 중...' : '아레나 생성'}
+          </Button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

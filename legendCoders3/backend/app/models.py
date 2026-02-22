@@ -152,6 +152,7 @@ class Arena(Base):
     baekjoon_problem_id = Column(Integer, nullable=True) # 대결 문제 (시작 시 확정)
     
     status = Column(String, default="WAITING") # WAITING, PLAYING, FINISHED, CANCELLED
+    mode = Column(String, default="OPEN") # OPEN, PRIVATE
     difficulty = Column(String, nullable=False) # BRONZE, SILVER, GOLD, PLATINUM, DIAMOND, RANDOM
 
     host_ready = Column(Boolean, default=False)

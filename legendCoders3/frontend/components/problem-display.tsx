@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { ProblemDetail } from '@/types/problem'; 
 import { toast } from 'sonner';
 import { API_BASE_URL } from '@/config';
@@ -42,7 +42,7 @@ export const ProblemDisplay: React.FC<ProblemDisplayProps> = ({ baekjoonProblemI
     return (
       <div className="flex flex-col items-center justify-center py-20 animate-pulse">
         <BrainCircuit className="w-12 h-12 text-slate-700 mb-4" />
-        <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px]">Identifying Problem...</p>
+        <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px]">챌린지 문제 식별 중...</p>
       </div>
     );
   }
@@ -82,7 +82,7 @@ export const ProblemDisplay: React.FC<ProblemDisplayProps> = ({ baekjoonProblemI
             <h3 className="text-xl font-bold text-white uppercase tracking-tight">문제를 확인하고 해결하세요</h3>
             <p className="text-slate-400 text-sm max-w-md mx-auto">
               보안 및 가독성을 위해 외부 사이트에서 직접 문제를 확인해 주시기 바랍니다. <br/>
-              해결 후 돌아와 <b>'제출 확인'</b> 버튼을 눌러 승리를 쟁취하세요!
+              해결 후 돌아와 <b>'코드 제출 및 검증'</b> 버튼을 눌러 승리를 쟁취하세요!
             </p>
           </div>
           <a 

@@ -300,7 +300,7 @@ export default function ArenaBattle() {
                   <Trophy className={`w-24 h-24 text-yellow-500 drop-shadow-[0_0_30px_rgba(234,179,8,0.6)] ${arena.winner_id === user?.id ? 'animate-bounce' : ''}`} />
                 </div>
                 
-                <h2 className="text-5xl font-black text-white mb-4 uppercase italic tracking-tighter">
+                <h2 className="text-5xl font-black text-white mb-4 uppercase italic tracking-tighter drop-shadow-xl">
                   {arena.winner_id === user?.id ? (
                     <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-500">Victory!</span>
                   ) : arena.winner_id ? (

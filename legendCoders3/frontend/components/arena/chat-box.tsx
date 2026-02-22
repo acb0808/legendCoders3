@@ -7,7 +7,7 @@ import { Send, MessageSquare, Clock, Info } from 'lucide-react';
 import TitleBadge from '@/components/title-badge';
 
 interface ChatMessage {
-  sender_id: string; // 'system' if it's a server message
+  sender_id: string; 
   sender_nickname?: string;
   sender_title?: string;
   content: string;
@@ -30,7 +30,6 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
   const [chatInput, setChatInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to bottom
   useEffect(() => {
     if (scrollRef.current) {
       const scrollContainer = scrollRef.current.querySelector('[data-radix-scroll-area-viewport]');
@@ -52,7 +51,7 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
       <div className="p-5 border-b border-white/5 flex justify-between items-center bg-slate-900/40">
         <div className="flex items-center gap-2">
           <MessageSquare size={14} className="text-rose-500" />
-          <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Battle Logs & Comms</h3>
+          <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Live Comms</h3>
         </div>
         <div className={`flex items-center gap-2 px-2 py-0.5 rounded-full border border-white/5 bg-slate-950/50`}>
           <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-rose-500 animate-pulse'}`} />
@@ -117,12 +116,12 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
         <div className="relative">
           <Input
             type="text"
-            placeholder={isConnected ? "Send message..." : "Connecting to arena..."}
+            placeholder={isConnected ? "메시지를 입력하세요..." : "아레나 연결 중..."}
             value={chatInput}
             disabled={!isConnected}
             onChange={(e) => setChatInput(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleSendChat()}
-            className="w-full bg-slate-950/50 border-white/5 text-sm h-12 pr-12 rounded-2xl focus:ring-rose-500/50 focus:border-rose-500/50 transition-all placeholder:text-slate-600 font-medium disabled:opacity-50"
+            className="w-full bg-slate-900/50 border-white/5 text-sm h-12 pr-12 rounded-2xl focus:ring-rose-500/50 focus:border-rose-500/50 transition-all placeholder:text-slate-600 font-medium disabled:opacity-50"
           />
           <button 
             onClick={handleSendChat}
