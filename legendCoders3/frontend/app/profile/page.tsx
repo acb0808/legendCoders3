@@ -143,14 +143,27 @@ export default function ProfilePage() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Baekjoon ID</label>
+                  <div className="flex justify-between items-center">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Baekjoon ID</label>
+                    {user?.email !== "test@test.com" && (
+                      <span className="text-[9px] font-bold text-amber-500 uppercase tracking-widest">수정 불가</span>
+                    )}
+                  </div>
                   <input
                     type="text"
                     value={baekjoonId}
                     onChange={(e) => setBaekjoonId(e.target.value)}
-                    className="w-full px-5 py-3 rounded-xl bg-gray-50 border border-transparent focus:bg-white focus:border-blue-500 transition-all font-bold text-gray-900"
+                    className={`w-full px-5 py-3 rounded-xl border border-transparent transition-all font-bold ${
+                      user?.email === "test@test.com" 
+                        ? "bg-gray-50 focus:bg-white focus:border-blue-500 text-gray-900" 
+                        : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                    }`}
+                    readOnly={user?.email !== "test@test.com"}
                     required
                   />
+                  {user?.email !== "test@test.com" && (
+                    <p className="text-[9px] text-gray-400 ml-1">백준 아이디 변경은 관리자에게 문의하세요.</p>
+                  )}
                 </div>
 
                 <div className="pt-4 border-t border-gray-50 grid grid-cols-1 md:grid-cols-2 gap-4">

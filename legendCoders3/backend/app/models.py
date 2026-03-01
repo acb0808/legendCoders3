@@ -16,6 +16,7 @@ class User(Base):
     nickname = Column(String, unique=True, index=True, nullable=False)
     baekjoon_id = Column(String, nullable=False)
     is_pro = Column(Boolean, default=False)
+    is_admin = Column(Boolean, default=False) # 어드민 여부 추가
     pro_expires_at = Column(DateTime(timezone=True), nullable=True)
     last_sync_at = Column(DateTime(timezone=True), nullable=True)
     streak_freeze_count = Column(Integer, default=0) # 스트릭 보호권 개수 추가
@@ -177,4 +178,16 @@ class Arena(Base):
     host = relationship("User", foreign_keys=[host_id])
     guest = relationship("User", foreign_keys=[guest_id])
     winner = relationship("User", foreign_keys=[winner_id])
+
+class InvitationCode(Base):
+    __tablename__ = "invitation_codes"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    code = Column(String, unique=True, index=True, nullable=False)
+    is_used = Column(Boolean, default=False)
+    used_by_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    used_at = Column(DateTime(timezone=True), nullable=True)
+
+    used_by = relationship("User")
 

@@ -34,7 +34,17 @@ def delete_existing_comment(
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    success = comments.delete_comment(db, comment_id, current_user.id)
-    if not success:
-        raise HTTPException(status_code=404, detail="Comment not found or not authorized to delete.")
+    db_comment = db.query(models.Comment).filter(models.Comment.id == comment_id).first()
+    if not db_comment:
+        raise HTTPException(status_code=404, detail="댓글을 찾을 수 없습니다.")
+    
+    # 본인이거나 관리자인 경우만 허용
+    if db_comment.user_id != current_user.id and not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="삭제 권한이 없습니다."
+        )
+    
+    db.delete(db_comment)
+    db.commit()
     return {"message": "Successfully deleted comment"}

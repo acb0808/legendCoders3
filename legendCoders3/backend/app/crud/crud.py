@@ -4,6 +4,8 @@ from sqlalchemy.orm import Session
 from .. import models, schemas
 from ..auth import get_password_hash # get_password_hash는 auth.py에서 가져옴
 
+from datetime import datetime
+
 def get_user_by_email(db: Session, email: str):
     return db.query(models.User).filter(models.User.email == email).first()
 
@@ -14,6 +16,17 @@ def get_user(db: Session, user_id: uuid.UUID):
     return db.query(models.User).filter(models.User.id == user_id).first()
 
 def create_user(db: Session, user: schemas.UserCreate):
+    # 1. 초대 코드 검증
+    invitation = db.query(models.InvitationCode).filter(
+        models.InvitationCode.code == user.invitation_code,
+        models.InvitationCode.is_used == False
+    ).first()
+    
+    if not invitation:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail="유효하지 않거나 이미 사용된 초대 코드입니다.")
+
+    # 2. 유저 생성
     hashed_password = get_password_hash(user.password)
     db_user = models.User(
         email=user.email,
@@ -22,6 +35,13 @@ def create_user(db: Session, user: schemas.UserCreate):
         baekjoon_id=user.baekjoon_id
     )
     db.add(db_user)
+    db.flush() # ID 생성을 위해 flush
+
+    # 3. 초대 코드 사용 완료 처리
+    invitation.is_used = True
+    invitation.used_by_user_id = db_user.id
+    invitation.used_at = datetime.now()
+    
     db.commit()
     db.refresh(db_user)
     return db_user

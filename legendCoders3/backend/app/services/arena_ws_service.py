@@ -38,6 +38,15 @@ class ArenaWsService:
             msg_type = message.get("type")
             payload = message.get("payload") or {}
 
+            # 0. 참여자 권한 검증 (보안 강화)
+            with SessionLocal() as db:
+                arena = db.query(models.Arena).filter(models.Arena.id == arena_id).first()
+                if not arena:
+                    return
+                if arena.host_id != user_id and arena.guest_id != user_id:
+                    print(f"Unauthorized action attempt by user {user_id} in arena {arena_id}")
+                    return
+
             if msg_type == "CHAT":
                 chat_payload = None
                 with SessionLocal() as db:

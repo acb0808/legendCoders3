@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useEffect, useState, use } from 'react';
+import React, { useEffect, useState, use, useMemo } from 'react';
 import { useAuth } from '@/components/auth-provider';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
+import DOMPurify from 'isomorphic-dompurify';
 import { 
   ChevronLeft, 
   User, 
@@ -47,9 +48,14 @@ export default function PostDetailPage({ params }: { params: Promise<{ id: strin
   
   const [post, setPost] = useState<Post | null>(null);
   const [commentContent, setCommentContent] = useState('');
-  const [replyTo, setReplyTo] = useState<Comment | null>(null); // 답글 대상 상태
+  const [replyTo, setReplyTo] = useState<Comment | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+
+  // XSS 방지를 위한 본문 새니타이징
+  const sanitizedPostContent = useMemo(() => 
+    DOMPurify.sanitize(post?.content || ''), [post?.content]
+  );
 
   const fetchPost = async () => {
     try {
@@ -84,7 +90,7 @@ export default function PostDetailPage({ params }: { params: Promise<{ id: strin
       await api.post('/comments/', {
         post_id: postId,
         content: commentContent,
-        parent_comment_id: replyTo?.id || null // 답글인 경우 부모 ID 전송
+        parent_comment_id: replyTo?.id || null
       });
       setCommentContent('');
       setReplyTo(null);
@@ -116,7 +122,6 @@ export default function PostDetailPage({ params }: { params: Promise<{ id: strin
     }
   };
 
-  // 댓글 계층 구조화 로직
   const renderComments = () => {
     if (!post) return null;
     
@@ -125,7 +130,6 @@ export default function PostDetailPage({ params }: { params: Promise<{ id: strin
 
     return parentComments.map(parent => (
       <div key={parent.id} className="space-y-4">
-        {/* 부모 댓글 */}
         <div className="bg-white p-6 rounded-[1.5rem] border border-gray-100 shadow-sm transition-all hover:shadow-md">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
@@ -147,19 +151,19 @@ export default function PostDetailPage({ params }: { params: Promise<{ id: strin
               >
                 답글
               </button>
-              {user?.id === parent.user_id && (
+              {(user?.id === parent.user_id || user?.is_admin) && (
                 <button onClick={() => handleDeleteComment(parent.id)} className="text-gray-300 hover:text-red-500">
                   <Trash2 size={14} />
                 </button>
               )}
             </div>
           </div>
-          <div className="text-gray-600 text-sm font-medium leading-relaxed whitespace-pre-wrap">
-            {parent.content}
-          </div>
+          <div 
+            className="text-gray-600 text-sm font-medium leading-relaxed whitespace-pre-wrap"
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(parent.content) }}
+          />
         </div>
 
-        {/* 자식 댓글 (대댓글) */}
         {childComments.filter(child => child.parent_comment_id === parent.id).map(child => (
           <div key={child.id} className="ml-10 flex gap-3">
             <CornerDownRight className="text-gray-200 mt-2 shrink-0" size={20} />
@@ -174,15 +178,16 @@ export default function PostDetailPage({ params }: { params: Promise<{ id: strin
                     {new Date(child.created_at).toLocaleDateString()}
                   </span>
                 </div>
-                {user?.id === child.user_id && (
+                {(user?.id === child.user_id || user?.is_admin) && (
                   <button onClick={() => handleDeleteComment(child.id)} className="text-gray-300 hover:text-red-500">
                     <Trash2 size={12} />
                   </button>
                 )}
               </div>
-              <div className="text-gray-600 text-sm font-medium whitespace-pre-wrap">
-                {child.content}
-              </div>
+              <div 
+                className="text-gray-600 text-sm font-medium whitespace-pre-wrap"
+                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(child.content) }}
+              />
             </div>
           </div>
         ))}
@@ -221,7 +226,7 @@ export default function PostDetailPage({ params }: { params: Promise<{ id: strin
               <Clock size={14} />
               {new Date(post.created_at).toLocaleString()}
             </div>
-            {user?.id === post.user_id && (
+            {(user?.id === post.user_id || user?.is_admin) && (
               <button 
                 onClick={handleDeletePost}
                 className="ml-auto flex items-center gap-1.5 text-red-400 hover:text-red-600 text-xs font-bold transition-colors"
@@ -245,9 +250,10 @@ export default function PostDetailPage({ params }: { params: Promise<{ id: strin
           </div>
         </header>
 
-        <div className="p-10 text-gray-700 leading-relaxed text-lg whitespace-pre-wrap font-medium">
-          {post.content}
-        </div>
+        <div 
+          className="p-10 text-gray-700 leading-relaxed text-lg whitespace-pre-wrap font-medium"
+          dangerouslySetInnerHTML={{ __html: sanitizedPostContent }}
+        />
 
         <footer className="px-10 py-6 bg-gray-50/50 flex items-center gap-6 border-t border-gray-50">
           <div className="flex items-center gap-2 text-gray-500">
@@ -261,11 +267,9 @@ export default function PostDetailPage({ params }: { params: Promise<{ id: strin
         </footer>
       </article>
 
-      {/* Comments Section */}
       <section className="space-y-8 pb-20">
         <h2 className="text-2xl font-black text-gray-900 px-2 tracking-tight uppercase">Discussion</h2>
         
-        {/* Comment/Reply Input */}
         <div id="comment-form" className="relative group">
           {replyTo && (
             <div className="absolute -top-10 left-0 right-0 flex items-center justify-between bg-blue-50 px-4 py-2 rounded-t-2xl text-xs font-bold text-blue-600 border-x border-t border-blue-100">
@@ -295,7 +299,6 @@ export default function PostDetailPage({ params }: { params: Promise<{ id: strin
           </form>
         </div>
 
-        {/* Structured Comment List */}
         <div className="space-y-8">
           {post.comments.length > 0 ? (
             renderComments()

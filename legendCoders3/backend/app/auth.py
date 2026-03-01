@@ -78,3 +78,12 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
     if user is None:
         raise credentials_exception
     return user
+
+async def get_current_admin(current_user: models.User = Depends(get_current_user)):
+    """현재 사용자가 관리자인지 확인하는 의존성"""
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="이 작업을 수행할 권한이 없습니다. 관리자 권한이 필요합니다."
+        )
+    return current_user

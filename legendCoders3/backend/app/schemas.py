@@ -10,6 +10,7 @@ class UserBase(BaseModel):
     nickname: str
     baekjoon_id: Optional[str] = None # Changed to Optional
     is_pro: bool = False
+    is_admin: bool = False # 어드민 여부 추가
     pro_expires_at: Optional[datetime] = None
     last_sync_at: Optional[datetime] = None
     streak_freeze_count: int = 0
@@ -32,12 +33,28 @@ class Title(TitleBase):
 
 class UserCreate(UserBase):
     password: str
+    invitation_code: str
+
+class InvitationCodeBase(BaseModel):
+    code: str
+
+class InvitationCodeResponse(InvitationCodeBase):
+    id: uuid.UUID
+    is_used: bool
+    used_by_user_id: Optional[uuid.UUID] = None
+    created_at: datetime
+    used_at: Optional[datetime] = None
+    nickname: Optional[str] = None # 사용한 유저 닉네임 편의상 추가
+
+    class Config:
+        from_attributes = True
 
 class UserUpdate(BaseModel):
     nickname: Optional[str] = None
     baekjoon_id: Optional[str] = None
     password: Optional[str] = None
     is_pro: Optional[bool] = None
+    is_admin: Optional[bool] = None # 어드민 수정 추가
     streak_freeze_count: Optional[int] = None
 
 class User(UserBase):
@@ -162,6 +179,23 @@ class UserDashboard(BaseModel):
     total_solved: int
     streak_days: int
     solve_history: List[date]
+
+class Activity(BaseModel):
+    date: date
+    type: str  # SOLVED, FROZEN, NONE
+    solved_count: int
+
+class WeeklyStatus(BaseModel):
+    date: date
+    day_name: str
+    is_solved: bool
+    has_problem: bool
+
+class UserWeeklyLeaderboard(BaseModel):
+    user_id: uuid.UUID
+    nickname: str
+    equipped_title: Optional[Title] = None
+    status: List[WeeklyStatus]
 
 # Arena Schemas
 class ArenaCreate(BaseModel):

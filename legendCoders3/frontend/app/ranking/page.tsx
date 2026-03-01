@@ -4,8 +4,9 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/components/auth-provider';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
-import { Trophy, Medal, Flame, Hash, User } from 'lucide-react';
+import { Trophy, Medal, Flame, Hash, User, Calendar, ArrowRight } from 'lucide-react';
 import TitleBadge from '@/components/title-badge';
+import Link from 'next/link';
 
 interface RankingUser {
   user_id: string;
@@ -69,12 +70,23 @@ export default function RankingPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-      <div className="text-center mb-12">
-        <div className="inline-flex items-center justify-center w-16 h-16 bg-yellow-50 text-yellow-600 rounded-2xl mb-4 shadow-sm">
-          <Trophy size={32} />
+      <div className="flex flex-col md:flex-row items-center justify-between gap-6 mb-12 bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
+        <div className="flex items-center gap-5">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-yellow-50 text-yellow-600 rounded-2xl shadow-inner">
+            <Trophy size={32} />
+          </div>
+          <div>
+            <h1 className="text-3xl font-black text-gray-900 tracking-tight italic uppercase">Legend Board</h1>
+            <p className="text-gray-500 font-medium">레전드 코더 명예의 전당</p>
+          </div>
         </div>
-        <h1 className="text-3xl font-black text-gray-900 tracking-tight italic uppercase">Legend Board</h1>
-        <p className="text-gray-500 mt-2 font-medium">레전드 코더 명예의 전당</p>
+        
+        <Link 
+          href="/ranking/weekly"
+          className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all active:scale-95 shadow-xl shadow-blue-100"
+        >
+          <Calendar size={16} /> 주간 현황판 보기 <ArrowRight size={16} />
+        </Link>
       </div>
 
       <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">

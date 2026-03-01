@@ -69,7 +69,18 @@ def delete_existing_post(
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    success = posts.delete_post(db, post_id, current_user.id)
-    if not success:
-        raise HTTPException(status_code=404, detail="Post not found or not authorized to delete.")
+    db_post = posts.get_post(db, post_id)
+    if not db_post:
+        raise HTTPException(status_code=404, detail="게시글을 찾을 수 없습니다.")
+    
+    # 권한 체크: 본인이거나 관리자인 경우만 허용
+    if db_post.user_id != current_user.id and not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="삭제 권한이 없습니다."
+        )
+    
+    # DB에서 삭제 수행 (CRUD 함수가 user_id를 받으므로 일관성을 위해 필터링 조건 없이 직접 삭제)
+    db.delete(db_post)
+    db.commit()
     return {"message": "Successfully deleted post"}

@@ -4,13 +4,15 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/components/auth-provider';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
-import { Trophy, Flame, Calendar, CheckCircle2, ArrowRight, Crown, RefreshCw, Snowflake, Swords } from 'lucide-react';
+import { Trophy, Flame, Calendar, CheckCircle2, ArrowRight, Crown, RefreshCw, Snowflake, Swords, XCircle } from 'lucide-react';
 import Link from 'next/link';
+import ActivityGraph from '@/components/activity-graph';
 
 export default function DashboardPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
   const [stats, setStats] = useState<any>(null);
+  const [weeklyStatus, setWeeklyStatus] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -20,10 +22,14 @@ export default function DashboardPage() {
   }, [user, loading, router]);
 
   useEffect(() => {
-    const fetchStats = async () => {
+    const fetchData = async () => {
       try {
-        const response = await api.get('/stats/me');
-        setStats(response.data);
+        const [statsRes, weeklyRes] = await Promise.all([
+          api.get('/stats/me'),
+          api.get('/stats/weekly')
+        ]);
+        setStats(statsRes.data);
+        setWeeklyStatus(weeklyRes.data);
       } catch (error) {
         console.error('Failed to fetch stats:', error);
       } finally {
@@ -32,7 +38,7 @@ export default function DashboardPage() {
     };
 
     if (user) {
-      fetchStats();
+      fetchData();
     }
   }, [user]);
 
@@ -45,6 +51,13 @@ export default function DashboardPage() {
   }
 
   if (!user) return null;
+
+  // 활동 데이터를 그래프 형식으로 변환
+  const activityData = stats?.solve_history?.map((dateStr: string) => ({
+    date: dateStr,
+    type: 'SOLVED',
+    solved_count: 1
+  })) || [];
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -122,6 +135,56 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* 주간 현황판 섹션 */}
+      <div className="mb-10 bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h2 className="text-xl font-black uppercase italic tracking-tighter text-gray-900">Weekly Status</h2>
+            <p className="text-sm text-gray-400 font-medium">이번 주 문제 해결 현황</p>
+          </div>
+          <div className="flex flex-col items-end gap-2">
+            <Link href="/ranking/weekly" className="text-[10px] font-black text-blue-600 uppercase tracking-widest hover:underline flex items-center gap-1">
+              전체 현황 보기 <ArrowRight size={12} />
+            </Link>
+            <div className="flex items-center gap-4 text-[10px] font-black uppercase tracking-widest text-gray-400">
+              <div className="flex items-center gap-1.5"><div className="w-2 h-2 bg-green-500 rounded-full" /> Solved</div>
+              <div className="flex items-center gap-1.5"><div className="w-2 h-2 bg-rose-500 rounded-full" /> Missed</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-4">
+          {weeklyStatus.map((day, idx) => {
+            const isToday = new Date(day.date).toDateString() === new Date().toDateString();
+            return (
+              <div key={idx} className={`flex flex-col items-center gap-3 p-4 rounded-3xl transition-all ${isToday ? "bg-blue-50/50 ring-2 ring-blue-500/20 shadow-inner" : "hover:bg-gray-50/50"}`}>
+                <span className={`text-xs font-black uppercase tracking-widest ${isToday ? "text-blue-600" : "text-gray-400"}`}>
+                  {day.day_name}
+                </span>
+                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm border ${
+                  day.is_solved 
+                    ? "bg-green-50 border-green-100 text-green-600" 
+                    : !day.has_problem 
+                      ? "bg-gray-50 border-gray-100 text-gray-300" 
+                      : "bg-rose-50 border-rose-100 text-rose-500"
+                }`}>
+                  {day.is_solved ? (
+                    <CheckCircle2 size={24} />
+                  ) : !day.has_problem ? (
+                    <div className="w-1.5 h-1.5 bg-gray-300 rounded-full" />
+                  ) : (
+                    <XCircle size={24} />
+                  )}
+                </div>
+                <span className={`text-[10px] font-bold ${isToday ? "text-blue-500" : "text-gray-400"}`}>
+                  {day.date.split('-')[2]}일
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="bg-gray-900 p-8 rounded-[2.5rem] text-white relative overflow-hidden group border-2 border-rose-500/20">
           <div className="relative z-10">
@@ -152,13 +215,7 @@ export default function DashboardPage() {
         </div>
 
         {/* 활동 통계 섹션 */}
-        <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm flex flex-col justify-center text-center">
-          <div className="w-20 h-20 bg-gray-50 rounded-3xl flex items-center justify-center mx-auto mb-6">
-            <RefreshCw className="text-gray-300" size={32} />
-          </div>
-          <h3 className="text-xl font-bold text-gray-900 mb-2">활동 그래프 준비 중</h3>
-          <p className="text-gray-500 font-medium">더 나은 분석을 위해 데이터를 수집하고 있습니다.</p>
-        </div>
+        <ActivityGraph data={activityData} months={3} userId={user.id} />
       </div>
     </div>
   );

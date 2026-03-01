@@ -21,7 +21,10 @@ import {
   Award,
   Sparkles,
   User,
-  Snowflake
+  Snowflake,
+  Ticket,
+  Copy,
+  ExternalLink
 } from 'lucide-react';
 import TitleBadge from '@/components/title-badge';
 
@@ -29,10 +32,11 @@ export default function AdminPage() {
   const { user, loading, refreshUser } = useAuth();
   const router = useRouter();
   
-  const [activeTab, setActiveTab] = useState<'users' | 'problems' | 'titles'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'problems' | 'titles' | 'invitations'>('users');
   const [usersList, setUsersList] = useState<any[]>([]);
   const [problemsList, setProblemsList] = useState<any[]>([]);
   const [allTitles, setAllTitles] = useState<any[]>([]);
+  const [invitationsList, setInvitationsList] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isActionLoading, setIsActionLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -79,9 +83,12 @@ export default function AdminPage() {
       } else if (activeTab === 'problems') {
         const res = await api.get('/admin/problems');
         setProblemsList(res.data);
-      } else {
+      } else if (activeTab === 'titles') {
         const res = await api.get('/titles/all');
         setAllTitles(res.data);
+      } else if (activeTab === 'invitations') {
+        const res = await api.get('/admin/invitations');
+        setInvitationsList(res.data);
       }
       
       if (allTitles.length === 0) {
@@ -92,6 +99,29 @@ export default function AdminPage() {
       console.error('Failed to fetch data:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const generateInvitation = async () => {
+    setIsActionLoading(true);
+    try {
+      await api.post('/admin/invitations');
+      setMessage("새로운 초대 코드가 생성되었습니다.");
+      fetchData();
+    } catch (error) {
+      alert("코드 생성 실패");
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const deleteInvitation = async (id: string) => {
+    if (!window.confirm("이 초대 코드를 삭제하시겠습니까?")) return;
+    try {
+      await api.delete(`/admin/invitations/${id}`);
+      fetchData();
+    } catch (error) {
+      alert("삭제 실패");
     }
   };
 
@@ -110,6 +140,24 @@ export default function AdminPage() {
       fetchData();
     } catch (error) {
       alert("수정 실패");
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const deleteUser = async (userId: string, nickname: string) => {
+    if (!window.confirm(`정말로 '${nickname}' 사용자를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없으며 모든 제출 기록과 게시글이 삭제될 수 있습니다.`)) {
+      return;
+    }
+
+    setIsActionLoading(true);
+    try {
+      await api.delete(`/admin/users/${userId}`);
+      setMessage(`'${nickname}' 사용자가 성공적으로 삭제되었습니다.`);
+      setEditingUser(null);
+      fetchData();
+    } catch (error) {
+      alert("사용자 삭제 실패");
     } finally {
       setIsActionLoading(false);
     }
@@ -205,6 +253,14 @@ export default function AdminPage() {
         >
           <Award size={20} /> 칭호 관리
         </button>
+        <button 
+          onClick={() => setActiveTab('invitations')}
+          className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-bold transition-all ${
+            activeTab === 'invitations' ? "bg-blue-600 text-white shadow-lg" : "bg-white text-gray-500 hover:bg-gray-50 border border-gray-100"
+          }`}
+        >
+          <Ticket size={20} /> 초대 코드
+        </button>
       </div>
 
       {message && (
@@ -217,6 +273,7 @@ export default function AdminPage() {
       <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
         {activeTab === 'users' ? (
           <div className="overflow-x-auto">
+            {/* ... usersList mapping ... */}
             <table className="w-full text-left">
               <thead className="bg-gray-50/50 border-b border-gray-100">
                 <tr>
@@ -236,7 +293,7 @@ export default function AdminPage() {
                       <div className="text-xs text-gray-400">{u.email}</div>
                     </td>
                     <td className="px-6 py-5 font-mono text-sm text-blue-600 font-bold">{u.baekjoon_id}</td>
-                    <td className="px-6 py-5 text-right">
+                    <td className="px-6 py-5 text-right flex justify-end gap-1">
                       <button 
                         onClick={() => {
                           setEditingUser(u);
@@ -246,8 +303,16 @@ export default function AdminPage() {
                           setEditFreezeCount(u.streak_freeze_count || 0);
                         }}
                         className="p-2 text-gray-300 hover:text-blue-500 transition-colors"
+                        title="수정"
                       >
                         <Edit2 size={18} />
+                      </button>
+                      <button 
+                        onClick={() => deleteUser(u.id, u.nickname)}
+                        className="p-2 text-gray-300 hover:text-rose-500 transition-colors"
+                        title="삭제"
+                      >
+                        <Trash2 size={18} />
                       </button>
                     </td>
                   </tr>
@@ -306,7 +371,7 @@ export default function AdminPage() {
               ))}
             </div>
           </div>
-        ) : (
+        ) : activeTab === 'titles' ? (
           <div className="p-8">
             <form onSubmit={handleCreateTitle} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-10 pb-8 border-b border-gray-50">
               <div className="space-y-2">
@@ -333,6 +398,73 @@ export default function AdminPage() {
                 </div>
               ))}
             </div>
+          </div>
+        ) : (
+          <div className="p-8">
+            <div className="flex justify-between items-center mb-10 pb-8 border-b border-gray-50">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">클로즈 베타 초대권</h2>
+                <p className="text-sm text-gray-500 font-medium">새로운 멤버를 초대하기 위한 고유 코드를 생성하세요.</p>
+              </div>
+              <button 
+                onClick={generateInvitation} 
+                disabled={isActionLoading}
+                className="bg-gray-900 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 hover:bg-gray-800 transition-all active:scale-95 shadow-xl shadow-gray-200"
+              >
+                {isActionLoading ? <Loader2 className="animate-spin" size={20} /> : <Plus size={20} />}
+                초대권 발급하기
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {invitationsList.map((inv) => (
+                <div key={inv.id} className={`p-6 rounded-[2rem] border transition-all ${inv.is_used ? "bg-gray-50 border-transparent opacity-60" : "bg-white border-gray-100 hover:shadow-lg shadow-sm"}`}>
+                  <div className="flex justify-between items-start mb-4">
+                    <div className={`p-3 rounded-2xl ${inv.is_used ? "bg-gray-200 text-gray-400" : "bg-blue-50 text-blue-600"}`}>
+                      <Ticket size={24} />
+                    </div>
+                    {!inv.is_used && (
+                      <button 
+                        onClick={() => {
+                          navigator.clipboard.writeText(inv.code);
+                          alert("코드가 복사되었습니다!");
+                        }}
+                        className="p-2 text-gray-300 hover:text-blue-500 transition-colors"
+                      >
+                        <Copy size={18} />
+                      </button>
+                    )}
+                    <button onClick={() => deleteInvitation(inv.id)} className="p-2 text-gray-300 hover:text-rose-500 transition-colors">
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
+                  
+                  <div className="space-y-1 mb-6">
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Invitation Code</p>
+                    <h3 className="text-2xl font-black text-gray-900 tracking-tighter font-mono">{inv.code}</h3>
+                  </div>
+
+                  <div className="pt-4 border-t border-gray-100">
+                    {inv.is_used ? (
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 bg-gray-200 rounded-full flex items-center justify-center text-[10px] font-black text-gray-500 uppercase">Used</div>
+                        <p className="text-xs font-bold text-gray-500">
+                          <span className="text-gray-900">{inv.nickname}</span>님이 사용함
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                        <p className="text-xs font-black text-green-600 uppercase tracking-widest">Available Now</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+            {invitationsList.length === 0 && (
+              <div className="text-center py-20 text-gray-300 font-bold italic">발급된 초대권이 없습니다.</div>
+            )}
           </div>
         )}
       </div>
@@ -367,6 +499,20 @@ export default function AdminPage() {
                 <button onClick={saveUserEdit} disabled={isActionLoading} className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all active:scale-95 disabled:opacity-50 mt-4 flex items-center justify-center gap-2">
                   {isActionLoading ? <Loader2 className="animate-spin" size={20}/> : <><Save size={20}/> Save Changes</>}
                 </button>
+
+                <div className="mt-10 pt-8 border-t border-rose-100">
+                  <div className="flex items-center gap-2 text-rose-500 mb-4">
+                    <Trash2 size={16} />
+                    <span className="text-[10px] font-black uppercase tracking-widest">Danger Zone</span>
+                  </div>
+                  <button 
+                    onClick={() => deleteUser(editingUser.id, editingUser.nickname)}
+                    disabled={isActionLoading}
+                    className="w-full bg-rose-50 text-rose-600 py-4 rounded-2xl font-bold hover:bg-rose-600 hover:text-white transition-all border border-rose-100 flex items-center justify-center gap-2"
+                  >
+                    회원 영구 삭제
+                  </button>
+                </div>
               </div>
             </div>
 

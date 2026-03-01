@@ -6,81 +6,97 @@ from typing import List
 from datetime import date, datetime, timedelta
 from .. import schemas, models
 from ..database import get_db
-from ..auth import get_current_user
+from ..auth import get_current_user, get_current_admin
 from ..crud import crud as user_crud, daily_problems
 from ..services.problem_selector import select_daily_problem, get_problem_details_from_baekjoon, get_tier_name
+import secrets
 
 router = APIRouter(
     prefix="/admin",
     tags=["admin"],
 )
 
-def verify_admin(current_user: models.User = Depends(get_current_user)):
-    if current_user.email != "test@test.com":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="관리자 권한이 없습니다."
-        )
-    return current_user
+# 모든 엔드포인트에서 Depends(get_current_admin)을 사용하여 보안 강화
 
 # --- 사용자 관리 ---
 
 @router.get("/users", response_model=List[schemas.User])
-def get_all_users(db: Session = Depends(get_db), admin=Depends(verify_admin)):
-    return db.query(models.User).all()
-
-@router.delete("/users/{user_id}")
-def delete_user(user_id: uuid.UUID, db: Session = Depends(get_db), admin=Depends(verify_admin)):
-    db_user = db.query(models.User).filter(models.User.id == user_id).first()
-    if not db_user:
-        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
-    db.delete(db_user)
-    db.commit()
-    return {"message": "사용자가 삭제되었습니다."}
+def get_all_users(db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+    """관리자가 모든 사용자 목록을 조회합니다."""
+    return db.query(models.User).order_by(models.User.created_at.desc()).all()
 
 @router.put("/users/{user_id}", response_model=schemas.User)
-def update_user_admin(user_id: uuid.UUID, user_update: schemas.UserUpdate, db: Session = Depends(get_db), admin=Depends(verify_admin)):
+def update_user_by_admin(
+    user_id: uuid.UUID,
+    user_update: schemas.UserUpdate,
+    db: Session = Depends(get_db),
+    admin=Depends(get_current_admin)
+):
+    """관리자가 특정 사용자의 정보를 수정합니다. (어드민 여부, 프로 여부 등 포함)"""
     db_user = db.query(models.User).filter(models.User.id == user_id).first()
     if not db_user:
         raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
     
-    if user_update.nickname is not None:
-        db_user.nickname = user_update.nickname
-    if user_update.baekjoon_id is not None:
-        db_user.baekjoon_id = user_update.baekjoon_id
-    if user_update.streak_freeze_count is not None:
-        db_user.streak_freeze_count = user_update.streak_freeze_count
+    update_data = user_update.dict(exclude_unset=True)
     
-    if hasattr(user_update, 'is_pro') and user_update.is_pro is not None:
-        if user_update.is_pro and not db_user.is_pro:
-            db_user.is_pro = True
+    # 비밀번호 변경 처리
+    if "password" in update_data and update_data["password"]:
+        from ..auth import get_password_hash
+        db_user.password_hash = get_password_hash(update_data["password"])
+        del update_data["password"]
+    
+    # 나머지 필드 업데이트
+    for key, value in update_data.items():
+        if key == "is_pro" and value and not db_user.is_pro:
             db_user.pro_expires_at = datetime.now() + timedelta(days=30)
-            db_user.streak_freeze_count = 5 # 5개 지급
-        elif not user_update.is_pro:
-            db_user.is_pro = False
-            db_user.pro_expires_at = None
-            db_user.streak_freeze_count = 0
-        
+            db_user.streak_freeze_count = max(db_user.streak_freeze_count, 5)
+        setattr(db_user, key, value)
+    
     db.commit()
     db.refresh(db_user)
     return db_user
 
+@router.delete("/users/{user_id}")
+def delete_user(
+    user_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    admin=Depends(get_current_admin)
+):
+    """관리자가 특정 사용자를 영구 삭제합니다."""
+    db_user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+    
+    # 관리자 본인 삭제 방지
+    if db_user.id == admin.id:
+        raise HTTPException(status_code=400, detail="관리자 본인 계정은 삭제할 수 없습니다.")
+
+    db.delete(db_user)
+    db.commit()
+    return {"message": "사용자가 삭제되었습니다."}
+
 # --- 문제 관리 ---
 
 @router.get("/problems", response_model=List[schemas.DailyProblem])
-def get_all_problems(db: Session = Depends(get_db), admin=Depends(verify_admin)):
+def get_all_problems(db: Session = Depends(get_db), admin=Depends(get_current_admin)):
     return db.query(models.DailyProblem).order_by(models.DailyProblem.problem_date.desc()).all()
 
-@router.post("/problems/force")
-def force_update_problem(problem_date: date, baekjoon_problem_id: int, db: Session = Depends(get_db), admin=Depends(verify_admin)):
-    target_problem = db.query(models.DailyProblem).filter(models.DailyProblem.problem_date == problem_date).first()
+@router.post("/problems/force", response_model=schemas.DailyProblem)
+def force_update_problem(
+    problem_date: date, 
+    baekjoon_problem_id: int, 
+    db: Session = Depends(get_db), 
+    admin=Depends(get_current_admin)
+):
+    """특정 날짜의 문제를 강제로 지정합니다."""
+    target_problem = db.query(models.DailyProblem).filter(
+        models.DailyProblem.problem_date >= datetime.combine(problem_date, datetime.min.time()),
+        models.DailyProblem.problem_date <= datetime.combine(problem_date, datetime.max.time())
+    ).first()
+    
     if target_problem:
-        post_ids = db.query(models.Post.id).filter(models.Post.daily_problem_id == target_problem.id).all()
-        post_ids = [p[0] for p in post_ids]
-        if post_ids:
-            db.query(models.Comment).filter(models.Comment.post_id.in_(post_ids)).delete(synchronize_session=False)
-            db.query(models.Post).filter(models.Post.id.in_(post_ids)).delete(synchronize_session=False)
-        db.query(models.Submission).filter(models.Submission.daily_problem_id == target_problem.id).delete(synchronize_session=False)
+        # 연관 데이터 삭제 (게시글, 댓글, 제출 등)
+        db.query(models.Submission).filter(models.Submission.daily_problem_id == target_problem.id).delete()
         db.delete(target_problem)
         db.commit()
 
@@ -110,19 +126,14 @@ def force_update_problem(problem_date: date, baekjoon_problem_id: int, db: Sessi
     return new_problem
 
 @router.post("/problems/{problem_id}/reseed")
-def reseed_problem(problem_id: uuid.UUID, db: Session = Depends(get_db), admin=Depends(verify_admin)):
+def reseed_problem(problem_id: uuid.UUID, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+    """문제를 AI가 다시 선정하도록 합니다."""
     target_problem = db.query(models.DailyProblem).filter(models.DailyProblem.id == problem_id).first()
     if not target_problem:
         raise HTTPException(status_code=404, detail="문제를 찾을 수 없습니다.")
+    
     target_date = target_problem.problem_date
-    
-    post_ids = db.query(models.Post.id).filter(models.Post.daily_problem_id == target_problem.id).all()
-    post_ids = [p[0] for p in post_ids]
-    if post_ids:
-        db.query(models.Comment).filter(models.Comment.post_id.in_(post_ids)).delete(synchronize_session=False)
-        db.query(models.Post).filter(models.Post.id.in_(post_ids)).delete(synchronize_session=False)
-    db.query(models.Submission).filter(models.Submission.daily_problem_id == target_problem.id).delete(synchronize_session=False)
-    
+    db.query(models.Submission).filter(models.Submission.daily_problem_id == target_problem.id).delete()
     db.delete(target_problem)
     db.commit()
     
@@ -131,25 +142,19 @@ def reseed_problem(problem_id: uuid.UUID, db: Session = Depends(get_db), admin=D
         raise HTTPException(status_code=500, detail="문제 재선정에 실패했습니다.")
     return new_problem
 
-@router.post("/problems/reset-today")
-def reset_today_problem(db: Session = Depends(get_db), admin=Depends(verify_admin)):
-    today = date.today()
-    target_problem = db.query(models.DailyProblem).filter(models.DailyProblem.problem_date == today).first()
-    if not target_problem:
-        return select_daily_problem(db, today)
-    return reseed_problem(target_problem.id, db, admin)
-
-@router.post("/problems/seed")
-def seed_specific_date(problem_date: date, db: Session = Depends(get_db), admin=Depends(verify_admin)):
-    problem = select_daily_problem(db, problem_date)
-    if not problem:
-        raise HTTPException(status_code=500, detail="문제 선정에 실패했습니다.")
-    return problem
+@router.delete("/problems/{problem_id}")
+def delete_problem(problem_id: uuid.UUID, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+    db_problem = db.query(models.DailyProblem).filter(models.DailyProblem.id == problem_id).first()
+    if not db_problem:
+        raise HTTPException(status_code=404, detail="문제를 찾을 수 없습니다.")
+    db.delete(db_problem)
+    db.commit()
+    return {"message": "문제가 삭제되었습니다."}
 
 # --- 칭호 관리 ---
 
 @router.post("/titles", response_model=schemas.Title)
-def create_new_title(title_data: schemas.TitleBase, db: Session = Depends(get_db), admin=Depends(verify_admin)):
+def create_new_title(title_data: schemas.TitleBase, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
     """운영자가 새로운 특수 칭호를 생성합니다."""
     db_title = models.Title(**title_data.dict())
     db.add(db_title)
@@ -158,9 +163,8 @@ def create_new_title(title_data: schemas.TitleBase, db: Session = Depends(get_db
     return db_title
 
 @router.post("/users/{user_id}/titles/{title_id}")
-def grant_user_title(user_id: uuid.UUID, title_id: uuid.UUID, db: Session = Depends(get_db), admin=Depends(verify_admin)):
+def grant_user_title(user_id: uuid.UUID, title_id: uuid.UUID, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
     """특정 사용자에게 칭호를 직접 부여합니다."""
-    # 이미 가지고 있는지 확인
     existing = db.query(models.UserTitle).filter(
         models.UserTitle.user_id == user_id,
         models.UserTitle.title_id == title_id
@@ -174,11 +178,45 @@ def grant_user_title(user_id: uuid.UUID, title_id: uuid.UUID, db: Session = Depe
     
     return {"message": "이미 보유 중인 칭호입니다."}
 
-@router.delete("/problems/{problem_id}")
-def delete_problem(problem_id: uuid.UUID, db: Session = Depends(get_db), admin=Depends(verify_admin)):
-    db_problem = db.query(models.DailyProblem).filter(models.DailyProblem.id == problem_id).first()
-    if not db_problem:
-        raise HTTPException(status_code=404, detail="문제를 찾을 수 없습니다.")
-    db.delete(db_problem)
+# --- 초대 코드 관리 ---
+
+@router.post("/invitations", response_model=schemas.InvitationCodeResponse)
+def generate_invitation_code(db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+    """관리자가 새로운 8자리 초대 코드를 생성합니다."""
+    code = secrets.token_hex(4).upper()
+    db_invitation = models.InvitationCode(code=code)
+    db.add(db_invitation)
     db.commit()
-    return {"message": "문제가 삭제되었습니다."}
+    db.refresh(db_invitation)
+    return db_invitation
+
+@router.get("/invitations", response_model=List[schemas.InvitationCodeResponse])
+def get_all_invitation_codes(db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+    """관리자가 전체 초대 코드 목록과 사용 현황을 확인합니다."""
+    invitations = db.query(models.InvitationCode).order_by(models.InvitationCode.created_at.desc()).all()
+    results = []
+    for inv in invitations:
+        nickname = None
+        if inv.used_by_user_id:
+            user = db.query(models.User).filter(models.User.id == inv.used_by_user_id).first()
+            nickname = user.nickname if user else "Unknown"
+        
+        results.append({
+            "id": inv.id,
+            "code": inv.code,
+            "is_used": inv.is_used,
+            "used_by_user_id": inv.used_by_user_id,
+            "created_at": inv.created_at,
+            "used_at": inv.used_at,
+            "nickname": nickname
+        })
+    return results
+
+@router.delete("/invitations/{code_id}")
+def delete_invitation_code(code_id: uuid.UUID, db: Session = Depends(get_db), admin=Depends(get_current_admin)):
+    db_inv = db.query(models.InvitationCode).filter(models.InvitationCode.id == code_id).first()
+    if not db_inv:
+        raise HTTPException(status_code=404, detail="코드를 찾을 수 없습니다.")
+    db.delete(db_inv)
+    db.commit()
+    return {"message": "초대 코드가 삭제되었습니다."}
