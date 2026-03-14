@@ -1,0 +1,55 @@
+services:
+  # 데이터베이스 (PostgreSQL)
+  db:
+    image: postgres:15-alpine
+    restart: always
+    environment:
+      - POSTGRES_USER=legendcoder
+      - POSTGRES_PASSWORD=legend_pass # 서버에서 .env 파일로 변경 권장
+      - POSTGRES_DB=legendcoder_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U legendcoder -d legendcoder_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 캐싱 및 실시간 처리를 위한 Redis
+  redis:
+    image: redis:7-alpine
+    restart: always
+
+  # FastAPI 백엔드
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      - DATABASE_URL=postgresql://legendcoder:legend_pass@db:5432/legendcoder_db
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=your_secret_key_here # 서버 .env에서 변경 필수
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    ports:
+      - "8000:8000"
+
+  # Next.js 프런트엔드
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: always
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000 # 추후 도메인 주소로 변경 가능
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
