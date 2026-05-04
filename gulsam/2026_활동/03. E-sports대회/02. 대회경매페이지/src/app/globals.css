@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+:root {
+  --background: #010a13;
+  --foreground: #f0e6d2;
+  --hextech-gold: #c89b3c;
+  --hextech-gold-bright: #f0e6d2;
+  --magic-blue: #005a82;
+  --magic-blue-bright: #0ac8b9;
+  --card-bg: rgba(1, 10, 19, 0.8);
+  --border-gold: rgba(200, 155, 60, 0.4);
+}
+
+@theme {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-gold: var(--hextech-gold);
+  --color-blue: var(--magic-blue);
+  --color-gold-bright: var(--hextech-gold-bright);
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+}
+
+.hextech-border {
+  border: 1px solid var(--border-gold);
+  position: relative;
+  background: var(--card-bg);
+  backdrop-filter: blur(10px);
+}
+
+.hextech-border::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  border: 1px solid rgba(200, 155, 60, 0.2);
+  pointer-events: none;
+}
+
+.gold-gradient-text {
+  background: linear-gradient(to bottom, #f0e6d2 0%, #c89b3c 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.btn-hextech {
+  background: linear-gradient(to bottom, #1e2328 0%, #010a13 100%);
+  border: 1px solid var(--hextech-gold);
+  color: var(--hextech-gold);
+  padding: 0.5rem 1.5rem;
+  transition: all 0.2s;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: bold;
+}
+
+.btn-hextech:hover:not(:disabled) {
+  background: var(--hextech-gold);
+  color: #010a13;
+  box-shadow: 0 0 15px rgba(200, 155, 60, 0.5);
+}
+
+.btn-hextech:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  border-color: #444;
+  color: #444;
+}

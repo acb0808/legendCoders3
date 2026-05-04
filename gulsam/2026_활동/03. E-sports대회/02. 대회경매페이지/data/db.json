@@ -1,0 +1,36 @@
+{
+  "captains": [
+    { "id": "c1", "name": "조장A", "points": 1000, "team": [] },
+    { "id": "c2", "name": "조장B", "points": 1000, "team": [] },
+    { "id": "c3", "name": "조장C", "points": 1000, "team": [] },
+    { "id": "c4", "name": "조장D", "points": 1000, "team": [] }
+  ],
+  "players": [
+    { "id": "p1", "name": "Faker", "tier": "Challenger", "position": "MID", "status": "unassigned" },
+    { "id": "p2", "name": "Zeus", "tier": "Challenger", "position": "TOP", "status": "unassigned" },
+    { "id": "p3", "name": "Oner", "tier": "Challenger", "position": "JUNGLE", "status": "unassigned" },
+    { "id": "p4", "name": "Gumayusi", "tier": "Challenger", "position": "ADC", "status": "unassigned" },
+    { "id": "p5", "name": "Keria", "tier": "Challenger", "position": "SUPPORT", "status": "unassigned" },
+    { "id": "p6", "name": "Chovy", "tier": "Challenger", "position": "MID", "status": "unassigned" },
+    { "id": "p7", "name": "Kiin", "tier": "Challenger", "position": "TOP", "status": "unassigned" },
+    { "id": "p8", "name": "Canyon", "tier": "Challenger", "position": "JUNGLE", "status": "unassigned" },
+    { "id": "p9", "name": "Peyz", "tier": "Challenger", "position": "ADC", "status": "unassigned" },
+    { "id": "p10", "name": "Lehends", "tier": "Challenger", "position": "SUPPORT", "status": "unassigned" },
+    { "id": "p11", "name": "ShowMaker", "tier": "Grandmaster", "position": "MID", "status": "unassigned" },
+    { "id": "p12", "name": "Aiming", "tier": "Grandmaster", "position": "ADC", "status": "unassigned" },
+    { "id": "p13", "name": "Viper", "tier": "Grandmaster", "position": "ADC", "status": "unassigned" },
+    { "id": "p14", "name": "Zeka", "tier": "Grandmaster", "position": "MID", "status": "unassigned" },
+    { "id": "p15", "name": "Doran", "tier": "Grandmaster", "position": "TOP", "status": "unassigned" },
+    { "id": "p16", "name": "Peanut", "tier": "Grandmaster", "position": "JUNGLE", "status": "unassigned" },
+    { "id": "p17", "name": "Delight", "tier": "Grandmaster", "position": "SUPPORT", "status": "unassigned" },
+    { "id": "p18", "name": "BeryL", "tier": "Master", "position": "SUPPORT", "status": "unassigned" },
+    { "id": "p19", "name": "Deft", "tier": "Master", "position": "ADC", "status": "unassigned" },
+    { "id": "p20", "name": "Pyosik", "tier": "Master", "position": "JUNGLE", "status": "unassigned" }
+  ],
+  "auctionHistory": [],
+  "config": {
+    "currentRound": 1,
+    "phase": "waiting",
+    "activePlayerId": null
+  }
+}
