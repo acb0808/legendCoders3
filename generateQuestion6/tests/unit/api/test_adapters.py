@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 from math_variant.agents.pipeline import CandidateVerdict, PipelineReport
 from math_variant.agents.schemas import CodeReviewOutput, CriticOutput, PlannerOutput
@@ -84,7 +83,7 @@ def _fail_verdict() -> CandidateVerdict:
     )
 
 
-def test_report_to_run_store_maps_candidates(tmp_path: Path) -> None:
+def test_report_to_run_store_maps_candidates() -> None:
     report = PipelineReport(
         run_id="run-1",
         planner=_planner(),
@@ -107,14 +106,65 @@ def test_report_to_run_store_maps_candidates(tmp_path: Path) -> None:
     assert candidate["evidence"]["checks"]
     assert candidate["blueprint_title"] == "질문 역전"
     assert candidate["critic_score"] == 8.0
+    checks = candidate["evidence"]["checks"]
+    assert any(c["kind"] == "sandbox" and c["status"] == "PASS" and c["critical"] for c in checks)
+    assert any(c["kind"] == "blind" for c in checks)
     # JSON 직렬화 가능 (RunStore.save_run 호환)
     json.dumps(data, ensure_ascii=False)
 
 
-def test_report_to_run_store_non_pass_keeps_status(tmp_path: Path) -> None:
+def test_report_to_run_store_non_pass_keeps_status() -> None:
     verdict = _fail_verdict()
     report = PipelineReport(
         run_id="run-2", planner=_planner(), ideas=[], adopted_ideas=[], candidates=[verdict]
     )
     data = report_to_run_store(report)
     assert data["candidates"][0]["verification_status"] == "FAIL"
+
+
+def test_report_to_run_store_reject_maps_to_unresolved() -> None:
+    candidate = _candidate("cand-3", "plan-3")
+    verdict = CandidateVerdict(
+        candidate=candidate,
+        blueprint_title="질문 역전",
+        code_review=CodeReviewOutput(verdict="REJECT", safe=False, test_consistent=False),
+        test_outcome=None,
+        blind_consensus=None,
+        critic=CriticOutput(score=3.0, difficulty_estimate="중상", recommendation="REJECT"),
+        status="UNRESOLVED",
+    )
+    report = PipelineReport(
+        run_id="run-3", planner=_planner(), ideas=[], adopted_ideas=[], candidates=[verdict]
+    )
+    data = report_to_run_store(report)
+    stored = data["candidates"][0]
+    assert stored["verification_status"] == "UNRESOLVED"
+    assert stored["validation_ref"] == "cand-3:sandbox-test"
+    assert not any(c["kind"] == "sandbox" for c in stored["evidence"]["checks"])
+
+
+def test_report_to_run_store_solver_disagreement_maps_to_unresolved() -> None:
+    candidate = _candidate("cand-4", "plan-4")
+    verdict = CandidateVerdict(
+        candidate=candidate,
+        blueprint_title="질문 역전",
+        code_review=CodeReviewOutput(verdict="APPROVE", safe=True, test_consistent=True),
+        test_outcome=VerificationOutcome(
+            verdict=TestVerdict.PASS,
+            status=SandboxStatus.COMPLETED,
+            detail="통과",
+        ),
+        blind_consensus=BlindConsensus(
+            status="SOLVER_DISAGREEMENT", solver_a="A", solver_b="B", reason="해집합 상이"
+        ),
+        critic=CriticOutput(score=7.0, difficulty_estimate="중상", recommendation="PASS"),
+        status="PASS",
+    )
+    report = PipelineReport(
+        run_id="run-4", planner=_planner(), ideas=[], adopted_ideas=[], candidates=[verdict]
+    )
+    data = report_to_run_store(report)
+    stored = data["candidates"][0]
+    assert stored["verification_status"] == "PASS"
+    blind = next(c for c in stored["evidence"]["checks"] if c["kind"] == "blind")
+    assert blind["status"] == "UNRESOLVED"

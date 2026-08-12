@@ -26,15 +26,22 @@ def report_to_run_store(report: PipelineReport) -> dict[str, Any]:
     }
 
 
+def _verdict_to_status(status: str) -> VerificationStatus:
+    """파이프라인 판정(Literal PASS/FAIL/UNRESOLVED/REVISE)을 저장 상태로 정규화한다."""
+    if status == "PASS":
+        return "PASS"
+    if status == "FAIL":
+        return "FAIL"
+    return "UNRESOLVED"
+
+
 def _candidate_to_dict(verdict: CandidateVerdict) -> dict[str, Any]:
     candidate = verdict.candidate
-    status: VerificationStatus = candidate.verification_status
-    if verdict.test_outcome is not None:
-        status = "PASS" if verdict.test_outcome.passes else "FAIL"
-        ref = candidate.validation_ref
-        if ref is None:
-            ref = f"{candidate.candidate_id}:sandbox-test"
-        candidate.mark_verified(status, ref)
+    status = _verdict_to_status(verdict.status)
+    # 파이프라인의 판정(verdict.status)을 후보 상태로 반영해 저장된 run 과 일치시킨다.
+    candidate.mark_verified(
+        status, candidate.validation_ref or f"{candidate.candidate_id}:sandbox-test"
+    )
     checks: list[dict[str, Any]] = []
     if verdict.test_outcome is not None:
         checks.append(
@@ -51,7 +58,9 @@ def _candidate_to_dict(verdict: CandidateVerdict) -> dict[str, Any]:
             {
                 "check_id": f"{candidate.candidate_id}-blind",
                 "kind": "blind",
-                "status": verdict.blind_consensus.status,
+                "status": "UNRESOLVED"
+                if verdict.blind_consensus.status == "SOLVER_DISAGREEMENT"
+                else verdict.blind_consensus.status,
                 "critical": False,
                 "evidence": {"reason": verdict.blind_consensus.reason},
             }
