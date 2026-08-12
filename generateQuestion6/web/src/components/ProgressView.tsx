@@ -40,6 +40,7 @@ export function ProgressView({ jobId }: { jobId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [reconnectKey, setReconnectKey] = useState(0);
   const logRef = useRef<HTMLDivElement>(null);
+  const seenIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -48,6 +49,7 @@ export function ProgressView({ jobId }: { jobId: string }) {
         if (!cancelled) {
           setStatus(data.status);
           setEvents(data.events);
+          seenIdsRef.current = new Set(data.events.map((event) => event.event_id));
           if (data.error?.message) {
             setError(data.error.message);
           }
@@ -68,7 +70,13 @@ export function ProgressView({ jobId }: { jobId: string }) {
       return;
     }
     const close = streamJobEvents(jobId, {
-      onEvent: (event) => setEvents((current) => [...current, event]),
+      onEvent: (event) => {
+        if (seenIdsRef.current.has(event.event_id)) {
+          return;
+        }
+        seenIdsRef.current.add(event.event_id);
+        setEvents((current) => [...current, event]);
+      },
       onDone: (finalStatus) => setStatus(finalStatus),
       onError: (message) => setError(message),
     });
@@ -115,6 +123,10 @@ export function ProgressView({ jobId }: { jobId: string }) {
           생성이 완료되었습니다.{" "}
           <Link href={`/runs/${jobId}/review`}>검토 화면으로 이동 →</Link>
         </p>
+      )}
+
+      {status === "queued" && events.length === 0 && !error && (
+        <p className="progress-loading">불러오는 중…</p>
       )}
 
       <div className="progress-grid">
