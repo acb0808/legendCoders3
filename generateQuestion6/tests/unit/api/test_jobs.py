@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import threading
+import time
 from pathlib import Path
 
 from math_variant.api.jobs import CreateOptions, JobStore
@@ -59,11 +61,13 @@ def test_complete_sets_report(tmp_path: Path) -> None:
 
 def test_list_sorted_by_created_desc(tmp_path: Path) -> None:
     store = _store(tmp_path)
-    store.create("첫번째")
-    store.create("두번째")
+    first = store.create("첫번째")
+    time.sleep(0.002)
+    second = store.create("두번째")
     jobs = store.list_jobs()
     assert len(jobs) == 2
-    assert jobs[0].job_id != jobs[1].job_id
+    assert jobs[0].created_at >= jobs[1].created_at
+    assert {j.job_id for j in jobs} == {first.job_id, second.job_id}
 
 
 def test_load_missing_raises(tmp_path: Path) -> None:
@@ -74,3 +78,26 @@ def test_load_missing_raises(tmp_path: Path) -> None:
         pass
     else:
         raise AssertionError("존재하지 않는 job 조회는 실패해야 한다")
+
+
+def test_concurrent_append_events_are_not_lost(tmp_path: Path) -> None:
+    store = _store(tmp_path)
+    job = store.create("원문", CreateOptions())
+    event = PipelineEvent(
+        event_id="e",
+        type="stage",
+        stage=EventStage.PLANNER,
+        status="done",
+    )
+
+    def worker() -> None:
+        for _ in range(20):
+            store.append_event(job.job_id, event)
+
+    threads = [threading.Thread(target=worker) for _ in range(4)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert len(store.load(job.job_id).events) == 80

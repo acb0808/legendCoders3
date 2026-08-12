@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import threading
 import uuid
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal, cast
@@ -68,7 +69,7 @@ class JobStore:
             job_id=run_id,
             run_id=run_id,
             source={"mode": source_mode, "text": source_text, "label": source_label},
-            options=options or CreateOptions(),
+            options=options if options is not None else CreateOptions(),
         )
         self.save(job)
         return job
@@ -83,9 +84,9 @@ class JobStore:
 
     def load(self, job_id: str) -> GenerationJob:
         path = self._path(job_id)
-        if not path.is_file():
-            raise ValueError(f"작업 없음: {job_id}")
         with self._lock:
+            if not path.is_file():
+                raise ValueError(f"작업 없음: {job_id}")
             data = cast(dict[str, Any], json.loads(path.read_text(encoding="utf-8")))
         return GenerationJob.model_validate(data)
 
@@ -99,26 +100,39 @@ class JobStore:
         jobs.sort(key=lambda j: j.created_at.isoformat(), reverse=True)
         return jobs
 
+    def _mutate(self, job_id: str, mutate: Callable[[GenerationJob], None]) -> GenerationJob:
+        path = self._path(job_id)
+        with self._lock:
+            if not path.is_file():
+                raise ValueError(f"작업 없음: {job_id}")
+            data = cast(dict[str, Any], json.loads(path.read_text(encoding="utf-8")))
+            job = GenerationJob.model_validate(data)
+            mutate(job)
+            job.updated_at = datetime.now(UTC)
+            path.write_text(
+                json.dumps(job.model_dump(mode="json"), ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+        return job
+
     def append_event(self, job_id: str, event: PipelineEvent) -> None:
-        job = self.load(job_id)
-        job.events.append(event)
-        self.save(job)
+        self._mutate(job_id, lambda job: job.events.append(event))
 
     def set_status(
         self, job_id: str, status: Literal["queued", "running", "completed", "failed"]
     ) -> None:
-        job = self.load(job_id)
-        job.status = status
-        self.save(job)
+        self._mutate(job_id, lambda job: setattr(job, "status", status))
 
     def complete(self, job_id: str, report: dict[str, Any]) -> None:
-        job = self.load(job_id)
-        job.status = "completed"
-        job.report = report
-        self.save(job)
+        def mutate(job: GenerationJob) -> None:
+            job.status = "completed"
+            job.report = report
+
+        self._mutate(job_id, mutate)
 
     def fail(self, job_id: str, message: str, code: str = "JOB_FAILED") -> None:
-        job = self.load(job_id)
-        job.status = "failed"
-        job.error = {"message": message, "code": code}
-        self.save(job)
+        def mutate(job: GenerationJob) -> None:
+            job.status = "failed"
+            job.error = {"message": message, "code": code}
+
+        self._mutate(job_id, mutate)
