@@ -53,6 +53,7 @@ class StructuredOutputEngine:
         self.logger = logger or logging.getLogger("math_variant.providers")
         self.role_resolver = role_resolver
         self.on_event = on_event
+        self._event_seq = 0
 
     def generate_structured(
         self,
@@ -209,8 +210,9 @@ class StructuredOutputEngine:
     ) -> None:
         if self.on_event is None:
             return
+        self._event_seq += 1
         event = PipelineEvent(
-            event_id=f"{request.request_id}-{attempts}",
+            event_id=f"evt-{self._event_seq}",
             type="llm_call",
             stage=ROLE_TO_STAGE.get(request.role.value, EventStage.DONE),
             status="done" if ok else "failed",
@@ -218,7 +220,9 @@ class StructuredOutputEngine:
             data={
                 "role": request.role.value,
                 "schema": request.response_schema,
-                "provider": final_provider or policy.provider,
+                "provider": final_provider
+                or (error.provider if error else None)
+                or policy.provider,
                 "model": policy.model,
                 "temperature": policy.temperature,
                 "attempts": attempts,
@@ -226,10 +230,18 @@ class StructuredOutputEngine:
                 "cost_usd": cost,
                 "ok": ok,
                 "summary": summarize_response(request.response_schema, data or {}),
-                "error": error.model_dump() if error else None,
+                "error": self._redact_error(error) if error else None,
             },
         )
         self.on_event(event)
+
+    @staticmethod
+    def _redact_error(error: ProviderError) -> dict[str, Any]:
+        return {
+            **error.model_dump(),
+            "detail": redact_secrets(error.detail),
+            "message": redact_secrets(error.message),
+        }
 
     @staticmethod
     def _repair_prompt(original: str, error: ProviderError) -> str:

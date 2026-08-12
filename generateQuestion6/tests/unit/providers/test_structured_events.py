@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 from math_variant.events import EventStage, PipelineEvent
-from math_variant.providers.contracts import RolePolicy, StructuredRequest
+from math_variant.providers.contracts import (
+    ProviderErrorCode,
+    RolePolicy,
+    StructuredRequest,
+)
 from math_variant.providers.registry import SchemaRegistry
 from math_variant.providers.structured import StructuredOutputEngine
 
@@ -28,6 +32,13 @@ class _Provider:
                 "cost_usd": 0.0,
             },
         )()
+
+
+class _RaisingProvider:
+    name = "fake"
+
+    def complete(self, prompt, policy):
+        raise RuntimeError("sk-ULTRA_SECRET_123 provider boom")
 
 
 def test_engine_emits_llm_call_event() -> None:
@@ -65,6 +76,41 @@ def test_engine_emits_llm_call_event() -> None:
     }
 
 
+def test_engine_emits_failed_event_when_provider_raises() -> None:
+    from math_variant.agents.schemas import register_agent_schemas
+
+    schemas = SchemaRegistry()
+    register_agent_schemas(schemas)
+    emitted: list[PipelineEvent] = []
+    engine = StructuredOutputEngine(
+        primary=None, fallback=None, schemas=schemas, on_event=emitted.append
+    )
+    engine.role_resolver = _FakeResolver(provider=_RaisingProvider())
+
+    response = engine.generate_structured(
+        StructuredRequest(
+            request_id="ideator-fail",
+            role=RolePolicy.IDEATOR,
+            prompt="p",
+            response_schema="IdeationOutput",
+        ),
+        policy=None,
+    )
+    assert not response.ok
+    assert response.error is not None
+    assert response.error.code == ProviderErrorCode.INFRA_ERROR
+    assert len(emitted) == 1
+    event = emitted[0]
+    assert event.type == "llm_call"
+    assert event.status == "failed"
+    assert event.data["ok"] is False
+    assert isinstance(event.data["error"], dict)
+    assert "code" in event.data["error"]
+    assert event.data["error"]["code"] == "INFRA_ERROR"
+    assert "sk-ULTRA" not in event.data["error"]["detail"]
+    assert event.data["summary"] == {}
+
+
 def test_engine_without_on_event_still_works() -> None:
     from math_variant.agents.schemas import register_agent_schemas
 
@@ -85,8 +131,11 @@ def test_engine_without_on_event_still_works() -> None:
 
 
 class _FakeResolver:
+    def __init__(self, provider=None) -> None:
+        self._provider = provider or _Provider()
+
     def provider_for(self, role: RolePolicy):
-        return _Provider()
+        return self._provider
 
     def fallback_for(self, role: RolePolicy):
         return None
