@@ -74,22 +74,22 @@ def test_empty_response_retries_with_original_prompt() -> None:
 
 
 def test_empty_response_exhausts_to_emitted_failure() -> None:
-    provider = FakeProvider("fake", ["", "", "", ""])  # 전부 빈 응답
+    provider = FakeProvider("fake", ["", "", "", "", "", ""])  # 전부 빈 응답
 
     engine = StructuredOutputEngine(
         primary=provider,
         fallback=None,
         schemas=_registry(),
-        max_transient_retries=2,
+        max_transient_retries=4,
     )
     response = engine.generate_structured(_request(), _policy())
 
     assert response.ok is False
     assert response.error is not None
     assert response.error.code == ProviderErrorCode.EMPTY_RESPONSE
-    # 1회 + 최대 재시도 2회 = 3회 시도
-    assert len(provider.calls) == 3
-    assert response.attempts == 3
+    # 1회 + 최대 재시도 4회 = 5회 시도
+    assert len(provider.calls) == 5
+    assert response.attempts == 5
 
 
 def test_transient_retries_disabled_matches_old_behavior() -> None:
@@ -107,3 +107,23 @@ def test_transient_retries_disabled_matches_old_behavior() -> None:
     assert response.error is not None
     assert response.error.code == ProviderErrorCode.EMPTY_RESPONSE
     assert len(provider.calls) == 1
+
+
+def test_truncated_json_is_retried_as_transient() -> None:
+    valid = __import__("json").dumps(
+        {"center": "(0,0)", "radius": "2", "line": "y=x", "goal": "x"}
+    )
+    provider = FakeProvider("fake", ["{broken", valid])  # 잘린 JSON 후 성공
+
+    engine = StructuredOutputEngine(
+        primary=provider,
+        fallback=None,
+        schemas=_registry(),
+        max_transient_retries=2,
+    )
+    response = engine.generate_structured(_request(), _policy())
+
+    assert response.ok is True
+    assert len(provider.calls) == 2
+    # 잘린 JSON 재시도는 원본 프롬프트 그대로
+    assert provider.calls[1] == "p"

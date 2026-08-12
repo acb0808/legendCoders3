@@ -150,7 +150,9 @@ def test_ct2_empty_truncated_extra_fields_are_structured_errors() -> None:
 
 def test_ct3_repair_once_then_fallback_once() -> None:
     valid = __import__("json").dumps({"center": "(0,0)", "radius": "2", "line": "y=x", "goal": "x"})
-    primary = FakeProvider("primary", ["{bad json", "also bad"])  # 첫 시도 + 복구 시도 둘 다 실패
+    # 유효 JSON 이지만 스키마 검증 실패 (필수 필드 누락) → repair 경로를 검증한다
+    schema_bad = __import__("json").dumps({"center": "(0,0)"})
+    primary = FakeProvider("primary", [schema_bad, schema_bad])  # 첫 시도 + 복구 시도 둘 다 실패
     fallback = FakeProvider("fallback", [valid])
 
     engine = StructuredOutputEngine(
@@ -158,6 +160,7 @@ def test_ct3_repair_once_then_fallback_once() -> None:
         fallback=fallback,
         schemas=_registry(),
         max_repair_attempts=1,
+        max_transient_retries=0,  # 복구·폴백 의미만 검증 (T08 transient 재시도 분리)
     )
     response = engine.generate_structured(
         StructuredRequest(
@@ -181,7 +184,8 @@ def test_ct3_no_fallback_when_primary_succeeds() -> None:
     fallback = FakeProvider("fallback", [])
 
     engine = StructuredOutputEngine(
-        primary=primary, fallback=fallback, schemas=_registry(), max_repair_attempts=1
+        primary=primary, fallback=fallback, schemas=_registry(), max_repair_attempts=1,
+        max_transient_retries=0,
     )
     response = engine.generate_structured(
         StructuredRequest(
@@ -302,7 +306,8 @@ def test_ct5_role_resolver_repair_once_on_resolved_primary() -> None:
     from math_variant.providers.resolver import RolePolicyConfig, RoleResolver
 
     valid = __import__("json").dumps({"center": "(0,0)", "radius": "2", "line": "y=x", "goal": "x"})
-    provider = FakeProvider("openai", ["{bad json", valid])
+    schema_bad = __import__("json").dumps({"center": "(0,0)"})
+    provider = FakeProvider("openai", [schema_bad, valid])
 
     config = RolePolicyConfig(
         roles={RolePolicy.SOURCE_ANALYZER: {"provider": "openai", "model": "gpt-5-mini"}}
@@ -313,6 +318,7 @@ def test_ct5_role_resolver_repair_once_on_resolved_primary() -> None:
         fallback=None,
         schemas=_registry(),
         max_repair_attempts=1,
+        max_transient_retries=0,  # 복구·폴백 의미만 검증 (T08 transient 재시도 분리)
     )
     engine.role_resolver = resolver
 

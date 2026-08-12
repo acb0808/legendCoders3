@@ -32,6 +32,7 @@ _SECRET_PATTERN = re.compile(r"(sk-[A-Za-z0-9_\-]{6,}|AIza[A-Za-z0-9_\-]{6,}|[A-
 _TRANSIENT_ERROR_CODES = frozenset(
     {
         ProviderErrorCode.EMPTY_RESPONSE,
+        ProviderErrorCode.TRUNCATED_JSON,
         ProviderErrorCode.INFRA_ERROR,
     }
 )
@@ -54,13 +55,13 @@ class StructuredOutputEngine:
         logger: logging.Logger | None = None,
         role_resolver: RoleResolver | None = None,
         on_event: Callable[[PipelineEvent], None] | None = None,
-        max_transient_retries: int = 2,
+        max_transient_retries: int = 4,
     ) -> None:
         self.primary = primary
         self.fallback = fallback
         self.schemas = schemas
         self.max_repair_attempts = max(0, min(1, max_repair_attempts))
-        self.max_transient_retries = max(0, min(3, max_transient_retries))
+        self.max_transient_retries = max(0, min(5, max_transient_retries))
         self.logger = logger or logging.getLogger("math_variant.providers")
         self.role_resolver = role_resolver
         self.on_event = on_event
