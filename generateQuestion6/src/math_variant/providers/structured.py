@@ -10,7 +10,11 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Callable
+from datetime import UTC, datetime
+from typing import Any
 
+from math_variant.events import ROLE_TO_STAGE, EventStage, PipelineEvent, summarize_response
 from math_variant.providers.base import LLMProvider, ModelPolicy
 from math_variant.providers.contracts import (
     ProviderError,
@@ -40,6 +44,7 @@ class StructuredOutputEngine:
         max_repair_attempts: int = 1,
         logger: logging.Logger | None = None,
         role_resolver: RoleResolver | None = None,
+        on_event: Callable[[PipelineEvent], None] | None = None,
     ) -> None:
         self.primary = primary
         self.fallback = fallback
@@ -47,6 +52,7 @@ class StructuredOutputEngine:
         self.max_repair_attempts = max(0, min(1, max_repair_attempts))
         self.logger = logger or logging.getLogger("math_variant.providers")
         self.role_resolver = role_resolver
+        self.on_event = on_event
 
     def generate_structured(
         self,
@@ -124,6 +130,11 @@ class StructuredOutputEngine:
                             "provider": final_provider,
                         },
                     )
+                    self._emit_llm_call(
+                        request, resolved_policy, ok=True, data=data,
+                        final_provider=final_provider, attempts=attempts,
+                        latency=latency, cost=cost, error=None,
+                    )
                     return ProviderResponse(
                         request_id=request.request_id,
                         ok=True,
@@ -168,6 +179,11 @@ class StructuredOutputEngine:
                 "recovered": fallback_used or repair_used > 0,
             },
         )
+        self._emit_llm_call(
+            request, resolved_policy, ok=False, data=None,
+            final_provider=final_provider, attempts=attempts,
+            latency=latency, cost=cost, error=last_error,
+        )
         return ProviderResponse(
             request_id=request.request_id,
             ok=False,
@@ -177,6 +193,43 @@ class StructuredOutputEngine:
             latency_ms=latency,
             cost_usd=cost,
         )
+
+    def _emit_llm_call(
+        self,
+        request: StructuredRequest,
+        policy: ModelPolicy,
+        *,
+        ok: bool,
+        data: dict[str, Any] | None,
+        final_provider: str | None,
+        attempts: int,
+        latency: int,
+        cost: float,
+        error: ProviderError | None,
+    ) -> None:
+        if self.on_event is None:
+            return
+        event = PipelineEvent(
+            event_id=f"{request.request_id}-{attempts}",
+            type="llm_call",
+            stage=ROLE_TO_STAGE.get(request.role.value, EventStage.DONE),
+            status="done" if ok else "failed",
+            ts=datetime.now(UTC),
+            data={
+                "role": request.role.value,
+                "schema": request.response_schema,
+                "provider": final_provider or policy.provider,
+                "model": policy.model,
+                "temperature": policy.temperature,
+                "attempts": attempts,
+                "latency_ms": latency,
+                "cost_usd": cost,
+                "ok": ok,
+                "summary": summarize_response(request.response_schema, data or {}),
+                "error": error.model_dump() if error else None,
+            },
+        )
+        self.on_event(event)
 
     @staticmethod
     def _repair_prompt(original: str, error: ProviderError) -> str:
