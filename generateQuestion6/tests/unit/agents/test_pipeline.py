@@ -115,6 +115,18 @@ class _PassSandbox:
         )
 
 
+class _FailSandbox:
+    name = "fake-fail"
+
+    def execute(self, request) -> SandboxResult:
+        return SandboxResult(
+            result_id="r",
+            request_id=request.request_id,
+            status=SandboxStatus.COMPLETED,
+            output_json={"result": {"verdict": "FAIL"}},
+        )
+
+
 class _PassSolvers:
     def __init__(self) -> None:
         self.calls: list[str] = []
@@ -201,6 +213,76 @@ def test_pipeline_writes_report_and_uses_blind(tmp_path) -> None:
     out = tmp_path / "report.json"
     assert out.is_file()
     assert pipeline.blind_calls == 2  # 후보 2건
+
+
+def test_pipeline_fail_closed_when_sandbox_returns_fail(tmp_path) -> None:
+    engine = _build_engine()
+    pipeline = _pipeline(engine, tmp_path)
+    pipeline.sandbox = _FailSandbox()  # type: ignore[assignment]
+    report = pipeline.run("원문")
+    for v in report.candidates:
+        assert v.status == "FAIL"
+        assert v.candidate.verification_status == "FAIL"
+
+
+def test_pipeline_reject_review_is_terminal_unresolved(tmp_path) -> None:
+    engine = _Engine(
+        {
+            "planner": [_PLANNER],
+            "ideator": [_IDEAS[0], _IDEAS[1]],
+            "selector": [{"adopted_ideas": ["idea-1"], "rationale": "부합"}],
+            "generator": [_CANDIDATE],
+            "code_reviewer": [
+                {"verdict": "REJECT", "safe": False, "test_consistent": False, "feedback": "폐기"}
+            ],
+            "critic": [_CRITIC, _CRITIC],
+            "judge": [_JUDGE],
+        }
+    )
+    report = _pipeline(engine, tmp_path, max_refine=2).run("원문")
+    assert len(report.candidates) == 1
+    assert report.candidates[0].status == "UNRESOLVED"
+    assert report.candidates[0].attempts == 1
+
+
+def test_pipeline_revise_exhausts_bound_to_unresolved(tmp_path) -> None:
+    engine = _Engine(
+        {
+            "planner": [_PLANNER],
+            "ideator": [_IDEAS[0], _IDEAS[1]],
+            "selector": [{"adopted_ideas": ["idea-1"], "rationale": "부합"}],
+            "generator": [_CANDIDATE, _CANDIDATE],
+            "code_reviewer": [_REVIEW_REVISE, _REVIEW_REVISE],
+            "critic": [_CRITIC, _CRITIC],
+            "judge": [_JUDGE],
+        }
+    )
+    report = _pipeline(engine, tmp_path, max_refine=2).run("원문")
+    assert report.candidates[0].attempts == 2
+    assert report.candidates[0].status == "UNRESOLVED"
+
+
+def test_pipeline_renders_figure_when_required(tmp_path) -> None:
+    from math_variant.agents.vision_artist import VisionArtist
+
+    engine = _Engine(
+        {
+            "planner": [_PLANNER],
+            "ideator": [_IDEAS[0], _IDEAS[1]],
+            "selector": [{"adopted_ideas": ["idea-1", "idea-2"], "rationale": "부합"}],
+            "generator": [{**_CANDIDATE, "needs_figure": True}, _CANDIDATE],
+            "code_reviewer": [_REVIEW_OK, _REVIEW_OK],
+            "critic": [_CRITIC, _CRITIC],
+            "judge": [_JUDGE],
+            "vision": [{"tikz_code": r"\draw (0,0) -- (1,1);", "caption": ""}],
+        }
+    )
+    figures = tmp_path / "figures"
+    pipeline = _pipeline(engine, tmp_path)
+    pipeline.vision = VisionArtist(engine, "v", figures)
+    pipeline.run("원문")
+    assert (figures / "cand-1.tex").is_file()
+    assert not (figures / "cand-2.tex").exists()
 
 
 def test_llm_blind_solver_uses_blind_role_and_returns_solution() -> None:

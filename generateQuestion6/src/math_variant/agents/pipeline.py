@@ -248,19 +248,20 @@ class AgentPipeline:
             )
 
         status: Literal["PASS", "FAIL", "UNRESOLVED", "REVISE"]
+        needs_revision = review.verdict == "REVISE" or critic.recommendation == "REVISE"
         if test_outcome is not None and test_outcome.passes:
             status = "PASS"
             candidate.mark_verified("PASS", f"{run_id}:sandbox-test")
-        elif review.verdict == "REVISE" or (
-            critic.recommendation == "REVISE" and attempts < self.max_refine
-        ):
+        elif review.verdict == "REJECT":
+            status = "UNRESOLVED"
+        elif needs_revision and attempts < self.max_refine:
             status = "REVISE"
         elif test_outcome is not None and test_outcome.verdict.value == "FAIL":
             status = "FAIL"
         else:
             status = "UNRESOLVED"
 
-        if status == "REVISE" and attempts < self.max_refine:
+        if status == "REVISE":
             feedback = review.feedback or "; ".join(critic.comments)
             return self._grow_candidate(
                 run_id,
