@@ -59,6 +59,10 @@ class _FakeRunner:
             ),
         )
         store.complete(job_id, {"run_id": job_id, "candidates": 1})
+        api_module._store.save_run(
+            job_id,
+            {"run_id": job_id, "candidates": [], "state": "GENERATED"},
+        )
 
 
 @pytest.fixture()
@@ -153,6 +157,40 @@ def test_generation_missing_problem_404(client: TestClient) -> None:
         json={"source": {"mode": "problem", "problem_id": "problem-nope"}, "options": {}},
     )
     assert response.status_code == 404
+
+
+def test_generated_run_is_retrievable_by_job_id(client: TestClient) -> None:
+    created = client.post(
+        "/api/generations",
+        json={"source": {"mode": "text", "text": "원문"}, "options": {}},
+    ).json()
+    job_id = created["job_id"]
+    response = client.get(f"/api/runs/{job_id}")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["run_id"] == job_id
+    job = client.get(f"/api/generations/{job_id}").json()
+    assert job["report"]["run_id"] == job_id
+
+
+def test_recover_stale_jobs_marks_running_as_failed(client: TestClient) -> None:
+    jobs_store = api_module._default_jobs()
+    running_job = jobs_store.create("원문")
+    jobs_store.set_status(running_job.job_id, "running")
+    queued_job = jobs_store.create("두번째")
+    api_module._recover_stale_jobs()
+    running = jobs_store.load(running_job.job_id)
+    assert running.status == "failed"
+    assert running.error == {
+        "message": "서버 재시작으로 작업이 중단되었다",
+        "code": "JOB_INTERRUPTED",
+    }
+    queued = jobs_store.load(queued_job.job_id)
+    assert queued.status == "failed"
+    assert queued.error == {
+        "message": "서버 재시작으로 작업이 중단되었다",
+        "code": "JOB_INTERRUPTED",
+    }
 
 
 def test_failed_job_releases_active_lock(client: TestClient, monkeypatch) -> None:

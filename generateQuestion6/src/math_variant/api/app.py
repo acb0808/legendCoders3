@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import threading
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Literal, Protocol
 
@@ -30,7 +31,26 @@ from math_variant.api.storage import (
     RunStore,
 )
 
-app = FastAPI(title="수학문제 변형기 API", version="0.1.0")
+
+def _recover_stale_jobs() -> None:
+    """재시작 시 queued/running 으로 남은 작업을 실패로 처리한다 (중단 복구)."""
+    jobs_store = _default_jobs()
+    for job in jobs_store.list_jobs():
+        if job.status in {"queued", "running"}:
+            jobs_store.fail(job.job_id, "서버 재시작으로 작업이 중단되었다", "JOB_INTERRUPTED")
+
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
+    _recover_stale_jobs()
+    yield
+
+
+app = FastAPI(
+    title="수학문제 변형기 API",
+    version="0.1.0",
+    lifespan=_lifespan,
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -123,8 +143,8 @@ class PipelineRunner:
                 ideator_count=int(options.get("ideator_count", 3)),
                 max_refine=int(options.get("max_refine", 2)),
                 on_event=lambda event: self.jobs.append_event(job_id, event),
-                runs_dir=Path("runs"),
-                figures_dir=Path("runs") / "figures",
+                runs_dir=Path("runs") / "artifacts" / job_id,
+                figures_dir=Path("runs") / "artifacts" / job_id / "figures",
                 sandbox_image=self.sandbox_image,
             )
             report = pipeline.run(
@@ -134,12 +154,15 @@ class PipelineRunner:
         except MathVariantError as exc:
             self.jobs.fail(job_id, exc.error.message, exc.code.value)
         except Exception as exc:  # 러너에서 어떤 실패도 job 에 남긴다
-            self.jobs.fail(job_id, str(exc)[:500])
+            from math_variant.providers.structured import redact_secrets
+
+            self.jobs.fail(job_id, redact_secrets(str(exc))[:500])
         else:
             run_data = report_to_run_store(report)
-            self.store.save_run(report.run_id, run_data)
+            run_data["run_id"] = job_id
+            self.store.save_run(job_id, run_data)
             self.jobs.complete(
-                job_id, {"run_id": report.run_id, "candidates": len(report.candidates)}
+                job_id, {"run_id": job_id, "candidates": len(report.candidates)}
             )
         finally:
             _clear_active(job_id)
