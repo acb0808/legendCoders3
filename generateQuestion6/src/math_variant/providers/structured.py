@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import re
+import threading
 from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
@@ -54,6 +55,7 @@ class StructuredOutputEngine:
         self.role_resolver = role_resolver
         self.on_event = on_event
         self._event_seq = 0
+        self._event_lock = threading.Lock()
 
     def generate_structured(
         self,
@@ -210,9 +212,11 @@ class StructuredOutputEngine:
     ) -> None:
         if self.on_event is None:
             return
-        self._event_seq += 1
+        with self._event_lock:
+            self._event_seq += 1
+            seq = self._event_seq
         event = PipelineEvent(
-            event_id=f"evt-{self._event_seq}",
+            event_id=f"llm-{seq}",
             type="llm_call",
             stage=ROLE_TO_STAGE.get(request.role.value, EventStage.DONE),
             status="done" if ok else "failed",

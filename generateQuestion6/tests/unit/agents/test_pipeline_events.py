@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from math_variant.agents.code_reviewer import CodeReviewAgent
 from math_variant.agents.critic import CriticAgent
 from math_variant.agents.generator import GeneratorAgent
@@ -12,6 +14,7 @@ from math_variant.agents.judge import JudgeAgent
 from math_variant.agents.pipeline import AgentPipeline
 from math_variant.agents.planner import PlannerAgent
 from math_variant.agents.selector import SelectorAgent
+from math_variant.errors import MathVariantError
 from math_variant.events import EventStage, PipelineEvent
 from math_variant.providers.contracts import ProviderResponse, RolePolicy
 from math_variant.providers.registry import SchemaRegistry
@@ -143,6 +146,15 @@ def test_pipeline_emits_stage_events_in_order(tmp_path) -> None:
     assert events[-1].stage == EventStage.DONE
     assert events[-1].status == "done"
 
+    started = [e for e in events if e.type == "stage" and e.status == "started"]
+    order = [e.stage for e in started]
+    expected = [
+        EventStage.PLANNER, EventStage.IDEATION, EventStage.SELECTION,
+        EventStage.GENERATION, EventStage.CODE_REVIEW, EventStage.SANDBOX,
+        EventStage.BLIND, EventStage.CRITIC, EventStage.JUDGE,
+    ]
+    assert order == expected
+
 
 def test_pipeline_emits_sandbox_and_candidate_scoped_events(tmp_path) -> None:
     engine = _Engine(
@@ -164,3 +176,36 @@ def test_pipeline_emits_sandbox_and_candidate_scoped_events(tmp_path) -> None:
     assert sandbox_events[0].status == "started"
     assert sandbox_events[1].status == "done"
     assert sandbox_events[0].candidate_id == "cand-1"
+
+
+def test_pipeline_emits_terminal_failed_when_planner_raises(tmp_path) -> None:
+    engine = _Engine({})
+    events: list[PipelineEvent] = []
+    pipeline = _build_pipeline(engine, tmp_path, events.append)
+
+    with pytest.raises(MathVariantError):
+        pipeline.run("원문")
+
+    assert events[-1].stage == EventStage.DONE
+    assert events[-1].status == "failed"
+
+
+def test_pipeline_skips_sandbox_on_rejected_review(tmp_path) -> None:
+    engine = _Engine(
+        {
+            "planner": [_PLANNER],
+            "ideator": [_IDEA],
+            "selector": [{"adopted_ideas": ["idea-1"], "rationale": "부합"}],
+            "generator": [_CANDIDATE],
+            "code_reviewer": [
+                {"verdict": "REJECT", "safe": False, "test_consistent": False, "feedback": "폐기"}
+            ],
+            "critic": [_CRITIC],
+            "judge": [_JUDGE],
+        }
+    )
+    events: list[PipelineEvent] = []
+    _build_pipeline(engine, tmp_path, events.append).run("원문")
+
+    assert all(e.stage != EventStage.SANDBOX for e in events)
+    assert events[-1].stage == EventStage.DONE

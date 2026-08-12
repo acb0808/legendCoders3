@@ -144,9 +144,10 @@ class AgentPipeline:
         if self.on_event is None:
             return
         self._event_seq += 1
+        seq = self._event_seq
         self.on_event(
             PipelineEvent(
-                event_id=f"evt-{self._event_seq}",
+                event_id=f"stage-{seq}",
                 type="stage",
                 stage=stage,
                 status=status,
@@ -156,6 +157,19 @@ class AgentPipeline:
         )
 
     def run(
+        self, source_text: str, strategy_brief: str = "", difficulty_target: str = ""
+    ) -> PipelineReport:
+        try:
+            return self._run(
+                source_text,
+                strategy_brief=strategy_brief,
+                difficulty_target=difficulty_target,
+            )
+        except Exception as exc:
+            self._emit(EventStage.DONE, "failed", f"실행 실패: {type(exc).__name__}")
+            raise
+
+    def _run(
         self, source_text: str, strategy_brief: str = "", difficulty_target: str = ""
     ) -> PipelineReport:
         run_id = f"run-{uuid.uuid4().hex[:8]}"
