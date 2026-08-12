@@ -1,0 +1,42 @@
+"""도형 렌더러 — VISION(gpt-5.6-luna)으로 TikZ 코드를 생성해 파일로 저장한다 (T07)."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+from math_variant.agents._common import request_structured
+from math_variant.agents.schemas import VisionOutput
+from math_variant.providers.contracts import RolePolicy
+from math_variant.providers.structured import StructuredOutputEngine
+
+
+class VisionArtist:
+    """VISION 역할을 호출해 후보의 도형을 TikZ 로 렌더링한다."""
+
+    def __init__(
+        self, engine: StructuredOutputEngine, prompt_bundle: str, figures_dir: Path
+    ) -> None:
+        self.engine = engine
+        self.prompt_bundle = prompt_bundle
+        self.figures_dir = figures_dir
+
+    def render(self, candidate_id: str, figure_notes: str, problem_text: str = "") -> Path:
+        prompt = f"{self.prompt_bundle}\n\n[문제 본문]\n{problem_text}\n[도형 설명]\n{figure_notes}"
+        data = request_structured(
+            self.engine,
+            request_id=f"vision-{candidate_id}",
+            role=RolePolicy.VISION,
+            prompt=prompt,
+            schema="VisionOutput",
+        )
+        output = VisionOutput.model_validate(data)
+        return self._save(candidate_id, output)
+
+    def _save(self, candidate_id: str, output: VisionOutput) -> Path:
+        self.figures_dir.mkdir(parents=True, exist_ok=True)
+        path = self.figures_dir / f"{candidate_id}.tex"
+        body = output.tikz_code.strip().strip("`")
+        path.write_text(
+            f"% figure for {candidate_id}\n% {output.caption}\n{body}\n", encoding="utf-8"
+        )
+        return path
