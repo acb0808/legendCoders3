@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import json
 
-from pydantic import Field
+from pydantic import Field, ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from math_variant.errors import ErrorCode, MathVariantError, StructuredError
 from math_variant.providers.contracts import RolePolicy
 from math_variant.providers.resolver import RolePolicyConfig, RolePolicyEntry
 
@@ -51,12 +52,21 @@ class ProviderSettings(BaseSettings):
     role_policy_json: str = Field(default="")
 
     def role_policy(self) -> RolePolicyConfig:
-        """역할 정책을 반환한다. 미설정 시 기본값 사용."""
+        """역할 정책을 반환한다. JSON 재정의는 기본값 위에 얹는다."""
         if not self.role_policy_json.strip():
             return RolePolicyConfig(roles=_default_roles(self.deepseek_model_flash))
-        raw = json.loads(self.role_policy_json)
-        roles: dict[RolePolicy, RolePolicyEntry] = {}
-        for role_str, entry in raw.items():
-            role = RolePolicy(role_str)
-            roles[role] = RolePolicyEntry.model_validate(entry)
+        roles = _default_roles(self.deepseek_model_flash)
+        try:
+            raw: dict[str, object] = json.loads(self.role_policy_json)
+            for role_str, entry in raw.items():
+                role = RolePolicy(role_str)
+                roles[role] = RolePolicyEntry.model_validate(entry)
+        except (json.JSONDecodeError, ValueError, AttributeError, ValidationError) as exc:
+            raise MathVariantError(
+                StructuredError(
+                    code=ErrorCode.PARSE_REJECTED,
+                    message="역할 정책 설정이 잘못되었다",
+                    context={"role_policy_json": self.role_policy_json},
+                )
+            ) from exc
         return RolePolicyConfig(roles=roles)
