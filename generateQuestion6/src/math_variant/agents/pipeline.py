@@ -154,6 +154,18 @@ class AgentPipeline:
         selection = self.selector.select(ideas, strategy_brief)
         adopted = [i for i in ideas if i.idea_id in set(selection.adopted_ideas)]
 
+        if not adopted:
+            report = PipelineReport(
+                run_id=run_id,
+                planner=planner_out,
+                ideas=ideas,
+                adopted_ideas=selection.adopted_ideas,
+                candidates=[],
+                ranking=[],
+            )
+            self._write_report(run_id, report)
+            return report
+
         candidates = self._generate_and_verify(run_id, adopted, ideation_brief, strategy_brief)
         rank_entries = [
             {
@@ -162,6 +174,7 @@ class AgentPipeline:
                 "test_pass": bool(v.test_outcome and v.test_outcome.passes),
                 "blind": str(v.blind_consensus.status) if v.blind_consensus else "NONE",
                 "critic_score": v.critic.score if v.critic else None,
+                "code_review": v.code_review.verdict if v.code_review else None,
                 "attempts": v.attempts,
             }
             for v in candidates
@@ -262,7 +275,11 @@ class AgentPipeline:
             status = "UNRESOLVED"
 
         if status == "REVISE":
-            feedback = review.feedback or "; ".join(critic.comments)
+            feedback = (
+                review.feedback
+                or "; ".join(critic.comments)
+                or "검증 스크립트를 수정하고 다시 생성하라"
+            )
             return self._grow_candidate(
                 run_id,
                 candidate_id,

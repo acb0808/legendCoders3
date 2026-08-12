@@ -282,6 +282,7 @@ def run_pipeline(argv: list[str] | None = None) -> int:
     from math_variant.agents.schemas import register_agent_schemas
     from math_variant.agents.selector import SelectorAgent
     from math_variant.agents.vision_artist import VisionArtist
+    from math_variant.errors import MathVariantError
     from math_variant.providers.factory import build_provider_registry
     from math_variant.providers.registry import SchemaRegistry
     from math_variant.providers.resolver import RoleResolver
@@ -323,7 +324,11 @@ def run_pipeline(argv: list[str] | None = None) -> int:
         max_refine=2,
     )
 
-    report = pipeline.run(normalize_source(question["question_text"]))
+    try:
+        report = pipeline.run(normalize_source(question["question_text"]))
+    except MathVariantError as exc:
+        print(f"파이프라인 실행 실패: [{exc.code}] {exc.error.message}", file=sys.stderr)
+        return 1
 
     print("=" * 70)
     print(f"run_id: {report.run_id}")
