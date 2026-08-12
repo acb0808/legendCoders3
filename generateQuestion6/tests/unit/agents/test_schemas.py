@@ -7,10 +7,12 @@ from pydantic import ValidationError
 
 from math_variant.agents.schemas import (
     CodeReviewOutput,
+    CriticOutput,
     GeneratorOutput,
     IdeationOutput,
     JudgeOutput,
     PlannerOutput,
+    SelectionOutput,
     VisionOutput,
     register_agent_schemas,
 )
@@ -77,11 +79,42 @@ def test_generator_requires_verification_script() -> None:
     assert output.verification_script
 
 
+def test_selection_output_schema() -> None:
+    output = SelectionOutput.model_validate({"adopted_ideas": ["idea-1"], "rationale": "x"})
+    assert output.adopted_ideas == ["idea-1"]
+    with pytest.raises(ValidationError):
+        SelectionOutput.model_validate({"adopted_ideas": [], "rationale": "x"})
+
+
+def test_critic_output_schema() -> None:
+    output = CriticOutput.model_validate(
+        {"score": 7.5, "difficulty_estimate": "중", "recommendation": "PASS"}
+    )
+    assert output.score == 7.5
+    with pytest.raises(ValidationError):
+        CriticOutput.model_validate(
+            {"score": 10.5, "difficulty_estimate": "중", "recommendation": "PASS"}
+        )
+    with pytest.raises(ValidationError):
+        CriticOutput.model_validate(
+            {"score": 7.5, "difficulty_estimate": "중", "recommendation": "APPROVE"}
+        )
+
+
 def test_code_review_and_judge_schemas() -> None:
     review = CodeReviewOutput.model_validate(
         {"verdict": "APPROVE", "safe": True, "test_consistent": True, "feedback": ""}
     )
     assert review.verdict == "APPROVE"
+    assert review.approves is True
+    revise = CodeReviewOutput.model_validate(
+        {"verdict": "REVISE", "safe": True, "test_consistent": True, "feedback": ""}
+    )
+    assert revise.approves is False
+    reject = CodeReviewOutput.model_validate(
+        {"verdict": "REJECT", "safe": True, "test_consistent": True, "feedback": ""}
+    )
+    assert reject.approves is False
     judge = JudgeOutput.model_validate(
         {"ranking": [{"candidate_id": "c1", "score": 8.0, "reason": "안전"}], "summary": ""}
     )
@@ -104,4 +137,4 @@ def test_vision_output_and_registry() -> None:
         "JudgeOutput",
         "VisionOutput",
     ):
-        assert name in registry._models
+        assert registry.resolve(name) is not None

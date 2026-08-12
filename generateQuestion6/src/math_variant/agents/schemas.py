@@ -68,7 +68,7 @@ class SelectionOutput(BaseModel):
 
 
 class GeneratorOutput(BaseModel):
-    """생성자 출력 — CandidateOutput + 검증 스크립트 + 도형 필요 여부."""
+    """생성자 출력 — CandidateProblem + 검증 스크립트 + 도형 필요 여부."""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
