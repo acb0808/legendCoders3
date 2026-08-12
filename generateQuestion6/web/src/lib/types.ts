@@ -140,7 +140,7 @@ export interface GenerationResult {
 export interface GenerationJob {
   job_id: string;
   run_id: string;
-  source: { mode: string; text: string; label?: string };
+  source: { mode: "text" | "problem"; text: string; label?: string };
   options: CreateOptions;
   status: JobStatus;
   events: JobEvent[];
@@ -156,6 +156,7 @@ export interface Problem {
   text: string;
   source: "manual" | "approved";
   source_run_id?: string | null;
+  text_hash?: string;
   created_at: string;
 }
 

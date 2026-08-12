@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   createGeneration,
@@ -10,7 +10,7 @@ import {
   streamJobEvents,
   verifiedCandidates,
 } from "./api";
-import type { Candidate, Problem } from "./types";
+import type { Candidate, JobEvent, Problem } from "./types";
 
 function makeProblem(overrides: Partial<Problem> = {}): Problem {
   return {
@@ -130,13 +130,13 @@ describe("생성 작업·문제 라이브러리 API (T08)", () => {
     );
   });
 
-  it("streamJobEvents 는 SSE 를 열고 정리 함수를 반환한다", () => {
-    const close = vi.fn();
+  describe("streamJobEvents SSE (T08)", () => {
     class FakeEventSource {
       static instances: FakeEventSource[] = [];
       handlers: Record<string, ((event: MessageEvent) => void)[]> = {};
       onmessage: ((event: MessageEvent) => void) | null = null;
       onerror: (() => void) | null = null;
+      closed = false;
       constructor(public url: string) {
         FakeEventSource.instances.push(this);
       }
@@ -144,25 +144,122 @@ describe("생성 작업·문제 라이브러리 API (T08)", () => {
         (this.handlers[type] ??= []).push(handler);
       }
       close() {
-        close();
+        this.closed = true;
       }
     }
-    const original = globalThis.EventSource;
-    (globalThis as Record<string, unknown>).EventSource = FakeEventSource;
 
-    const onEvent = vi.fn();
-    const onDone = vi.fn();
-    const onError = vi.fn();
-    const cleanup = streamJobEvents("run-1", { onEvent, onDone, onError });
+    function fireOnMessage(es: FakeEventSource, data: unknown) {
+      es.onmessage?.({ data: JSON.stringify(data) } as MessageEvent);
+    }
 
-    const es = FakeEventSource.instances[0]!;
-    expect(es.url).toContain("/api/generations/run-1/events");
+    let originalEventSource: typeof EventSource;
 
-    es.handlers["done"]![0]!(new MessageEvent("done", { data: "completed" }));
-    expect(onDone).toHaveBeenCalledWith("completed");
+    beforeEach(() => {
+      originalEventSource = globalThis.EventSource;
+      FakeEventSource.instances = [];
+      (globalThis as Record<string, unknown>).EventSource = FakeEventSource;
+    });
 
-    cleanup();
-    expect(close).toHaveBeenCalled();
-    (globalThis as Record<string, unknown>).EventSource = original;
+    afterEach(() => {
+      (globalThis as Record<string, unknown>).EventSource = originalEventSource;
+    });
+
+    it("SSE 를 열고 정리 함수를 반환한다", () => {
+      const onEvent = vi.fn();
+      const onDone = vi.fn();
+      const onError = vi.fn();
+      const cleanup = streamJobEvents("run-1", { onEvent, onDone, onError });
+
+      const es = FakeEventSource.instances[0]!;
+      expect(es.url).toContain("/api/generations/run-1/events");
+
+      cleanup();
+      expect(es.closed).toBe(true);
+    });
+
+    it("done 이벤트는 onDone 을 호출하고 소스를 닫는다", () => {
+      const onEvent = vi.fn();
+      const onDone = vi.fn();
+      const onError = vi.fn();
+      streamJobEvents("run-1", { onEvent, onDone, onError });
+      const es = FakeEventSource.instances[0]!;
+
+      es.handlers["done"]![0]!(new MessageEvent("done", { data: "completed" }));
+
+      expect(onDone).toHaveBeenCalledWith("completed");
+      expect(es.closed).toBe(true);
+      expect(onEvent).not.toHaveBeenCalled();
+    });
+
+    it("onmessage 의 llm_call 이벤트를 파싱해 onEvent 로 전달한다", () => {
+      const onEvent = vi.fn();
+      const onDone = vi.fn();
+      const onError = vi.fn();
+      streamJobEvents("run-1", { onEvent, onDone, onError });
+      const es = FakeEventSource.instances[0]!;
+
+      const event: JobEvent = {
+        event_id: "e1",
+        type: "llm_call",
+        stage: "초안 작성",
+        status: "started",
+        message: "LLM 호출 시작",
+        ts: "2026-01-01T00:00:00+00:00",
+        data: {},
+      };
+      fireOnMessage(es, event);
+
+      expect(onEvent).toHaveBeenCalledWith(event);
+      expect(onDone).not.toHaveBeenCalled();
+    });
+
+    it("done 이벤트는 onEvent 를 중복 발화하지 않는다", () => {
+      const onEvent = vi.fn();
+      const onDone = vi.fn();
+      const onError = vi.fn();
+      streamJobEvents("run-1", { onEvent, onDone, onError });
+      const es = FakeEventSource.instances[0]!;
+
+      const event: JobEvent = {
+        event_id: "e1",
+        type: "llm_call",
+        stage: "초안 작성",
+        status: "done",
+        message: "완료",
+        ts: "2026-01-01T00:00:00+00:00",
+        data: {},
+      };
+      fireOnMessage(es, event);
+      es.handlers["done"]![0]!(new MessageEvent("done", { data: "completed" }));
+
+      expect(onEvent).toHaveBeenCalledTimes(1);
+      expect(onDone).toHaveBeenCalledWith("completed");
+    });
+
+    it("비정상 JSON 프레임은 던지지 않고 무시한다", () => {
+      const onEvent = vi.fn();
+      const onDone = vi.fn();
+      const onError = vi.fn();
+      streamJobEvents("run-1", { onEvent, onDone, onError });
+      const es = FakeEventSource.instances[0]!;
+
+      expect(() => {
+        es.onmessage?.({ data: "{not json" } as MessageEvent);
+      }).not.toThrow();
+      expect(onEvent).not.toHaveBeenCalled();
+    });
+
+    it("onerror 는 안내 문구를 전달하고 소스를 닫는다", () => {
+      const onEvent = vi.fn();
+      const onDone = vi.fn();
+      const onError = vi.fn();
+      streamJobEvents("run-1", { onEvent, onDone, onError });
+      const es = FakeEventSource.instances[0]!;
+
+      es.onerror?.();
+
+      expect(onError).toHaveBeenCalledWith("진행 스트림 연결이 끊어졌습니다");
+      expect(es.closed).toBe(true);
+    });
   });
 });

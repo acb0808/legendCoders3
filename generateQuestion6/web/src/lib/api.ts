@@ -69,7 +69,7 @@ export async function createGeneration(
 }
 
 export async function getJob(jobId: string): Promise<GenerationJob> {
-  return requestJson<GenerationJob>(`/api/generations/${jobId}`);
+  return requestJson<GenerationJob>(`/api/generations/${encodeURIComponent(jobId)}`);
 }
 
 export function streamJobEvents(
@@ -80,7 +80,7 @@ export function streamJobEvents(
     onError: (message: string) => void;
   },
 ): () => void {
-  const source = new EventSource(`${API_BASE}/api/generations/${jobId}/events`);
+  const source = new EventSource(`${API_BASE}/api/generations/${encodeURIComponent(jobId)}/events`);
   source.addEventListener("done", (event) => {
     handlers.onDone((event as MessageEvent).data as JobStatus);
     source.close();
@@ -111,7 +111,9 @@ export async function registerProblem(payload: ProblemRequest): Promise<Problem>
 }
 
 export async function deleteProblem(problemId: string): Promise<void> {
-  const response = await fetch(`${API_BASE}/api/problems/${problemId}`, { method: "DELETE" });
+  const response = await fetch(`${API_BASE}/api/problems/${encodeURIComponent(problemId)}`, {
+    method: "DELETE",
+  });
   if (!response.ok) {
     const body = await response.text();
     throw new Error(`API 오류 ${response.status}: ${body.slice(0, 200)}`);
