@@ -285,6 +285,14 @@ def test_pipeline_renders_figure_when_required(tmp_path) -> None:
     assert not (figures / "cand-2.tex").exists()
 
 
+def test_pipeline_forwards_difficulty_target_to_planner(tmp_path) -> None:
+    engine = _build_engine()
+    _pipeline(engine, tmp_path).run("원문", difficulty_target="상")
+    planner_prompt = next(p for role, p in engine.calls if role == RolePolicy.PLANNER)
+    assert "난이도 목표" in planner_prompt
+    assert "상" in planner_prompt
+
+
 def test_llm_blind_solver_uses_blind_role_and_returns_solution() -> None:
     engine = _Engine(
         {

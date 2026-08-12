@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import uuid
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from pathlib import Path
@@ -39,6 +40,7 @@ from math_variant.agents.schemas import (
 from math_variant.agents.selector import SelectorAgent
 from math_variant.agents.vision_artist import VisionArtist
 from math_variant.domain.candidate import CandidateProblem
+from math_variant.events import EventStage, PipelineEvent
 from math_variant.sandbox.provider import SandboxProvider
 from math_variant.services.blind_solver import BlindConsensus
 from math_variant.verifiers.test_runner import (
@@ -112,6 +114,7 @@ class AgentPipeline:
         ideator_count: int = 3,
         max_workers: int = 4,
         max_refine: int = 2,
+        on_event: Callable[[PipelineEvent], None] | None = None,
     ) -> None:
         self.planner = planner
         self.ideator = ideator
@@ -128,10 +131,37 @@ class AgentPipeline:
         self.max_workers = max_workers
         self.max_refine = max_refine
         self.blind_calls = 0
+        self.on_event = on_event
+        self._event_seq = 0
 
-    def run(self, source_text: str, strategy_brief: str = "") -> PipelineReport:
+    def _emit(
+        self,
+        stage: EventStage,
+        status: Literal["started", "done", "failed"],
+        message: str = "",
+        candidate_id: str | None = None,
+    ) -> None:
+        if self.on_event is None:
+            return
+        self._event_seq += 1
+        self.on_event(
+            PipelineEvent(
+                event_id=f"evt-{self._event_seq}",
+                type="stage",
+                stage=stage,
+                status=status,
+                message=message,
+                candidate_id=candidate_id,
+            )
+        )
+
+    def run(
+        self, source_text: str, strategy_brief: str = "", difficulty_target: str = ""
+    ) -> PipelineReport:
         run_id = f"run-{uuid.uuid4().hex[:8]}"
-        planner_out = self.planner.plan(source_text)
+        self._emit(EventStage.PLANNER, "started", "원문을 분석하여 변형 전략을 수립한다")
+        planner_out = self.planner.plan(source_text, difficulty_target=difficulty_target)
+        self._emit(EventStage.PLANNER, "done", "변형 스펙·전략 수립 완료")
         strategy = _to_strategy_dict(planner_out.strategy)
         if not strategy_brief:
             strategy_brief = json.dumps(strategy, ensure_ascii=False)
@@ -144,6 +174,7 @@ class AgentPipeline:
             preservation_goals=planner_out.preservation_goals,
             strategy=planner_out.strategy,
         )
+        self._emit(EventStage.IDEATION, "started", f"변형 아이디어 {self.ideator_count}개 발상")
         with ThreadPoolExecutor(max_workers=self.max_workers) as pool:
             ideas = list(
                 pool.map(
@@ -151,10 +182,14 @@ class AgentPipeline:
                     range(self.ideator_count),
                 )
             )
+        self._emit(EventStage.IDEATION, "done", f"발상 완료 ({len(ideas)}개)")
+        self._emit(EventStage.SELECTION, "started", "아이디어 채택 선별")
         selection = self.selector.select(ideas, strategy_brief)
         adopted = [i for i in ideas if i.idea_id in set(selection.adopted_ideas)]
+        self._emit(EventStage.SELECTION, "done", f"채택 {len(adopted)}개")
 
         if not adopted:
+            self._emit(EventStage.DONE, "failed", "채택된 아이디어가 없다")
             report = PipelineReport(
                 run_id=run_id,
                 planner=planner_out,
@@ -179,7 +214,9 @@ class AgentPipeline:
             }
             for v in candidates
         ]
+        self._emit(EventStage.JUDGE, "started", "최종 랭킹 집계")
         judge_out = self.judge.judge(rank_entries, run_id=run_id)
+        self._emit(EventStage.JUDGE, "done", "집계 완료")
         ranking = judge_out.ranking if judge_out.ranking else rank_entries
 
         report = PipelineReport(
@@ -190,6 +227,7 @@ class AgentPipeline:
             candidates=candidates,
             ranking=ranking,
         )
+        self._emit(EventStage.DONE, "done", f"완료 — 후보 {len(report.candidates)}건")
         self._write_report(run_id, report)
         return report
 
@@ -226,20 +264,25 @@ class AgentPipeline:
             "changed_dimensions": [d.value for d in blueprint.changed_dimensions],
             "construction_blueprint": blueprint.construction_blueprint,
         }
+        self._emit(EventStage.GENERATION, "started", "문제 생성", candidate_id)
         candidate, extra = self.generator.generate(
             candidate_id=candidate_id,
             blueprint=blueprint_dict,
             brief=ideation_brief,
             feedback=feedback,
         )
+        self._emit(EventStage.GENERATION, "done", "생성 완료", candidate_id)
+        self._emit(EventStage.CODE_REVIEW, "started", "검증 스크립트 심사", candidate_id)
         review = self.code_reviewer.review(
             extra.verification_script,
             candidate.problem_text,
             candidate.final_answer_claim,
             candidate_id=candidate_id,
         )
+        self._emit(EventStage.CODE_REVIEW, "done", f"심사: {review.verdict}", candidate_id)
         test_outcome: VerificationOutcome | None = None
         if review.approves:
+            self._emit(EventStage.SANDBOX, "started", "샌드박스 검증 실행", candidate_id)
             request = build_verification_request(
                 f"{run_id}-{candidate_id}-v{attempts}",
                 extra.verification_script,
@@ -249,11 +292,18 @@ class AgentPipeline:
                 },
             )
             test_outcome = run_verification(self.sandbox, request)
+            self._emit(
+                EventStage.SANDBOX, "done", f"검증: {test_outcome.verdict.value}", candidate_id
+            )
+        self._emit(EventStage.BLIND, "started", "블라인드 풀이 A·B", candidate_id)
         consensus = self.blind_solvers.solve_both(candidate.problem_text)
         self.blind_calls += 1
+        self._emit(EventStage.BLIND, "done", f"합의: {consensus.status}", candidate_id)
+        self._emit(EventStage.CRITIC, "started", "품질 비평", candidate_id)
         critic = self.critic.criticize(
             candidate.problem_text, ideation_brief, strategy_brief, candidate_id=candidate_id
         )
+        self._emit(EventStage.CRITIC, "done", f"점수: {critic.score}", candidate_id)
 
         if self.vision is not None and (extra.needs_figure or blueprint.figure_required):
             self.vision.render(
