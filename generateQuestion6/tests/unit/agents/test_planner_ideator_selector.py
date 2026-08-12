@@ -6,7 +6,12 @@ import pytest
 
 from math_variant.agents.ideator import IdeatorAgent, build_ideation_brief
 from math_variant.agents.planner import PlannerAgent
-from math_variant.agents.schemas import IdeationOutput, PlannerOutput, SelectionOutput
+from math_variant.agents.schemas import (
+    IdeationOutput,
+    PlannerOutput,
+    ProductionStrategy,
+    SelectionOutput,
+)
 from math_variant.agents.selector import SelectorAgent
 from math_variant.errors import MathVariantError
 from math_variant.providers.contracts import ProviderResponse, RolePolicy
@@ -66,6 +71,7 @@ def test_planner_returns_strategy_and_rejects_original_text_in_strategy() -> Non
     assert engine.calls == [RolePolicy.PLANNER]
     serialized = output.model_dump_json()
     assert "y=x^2-3x-8" not in serialized
+    assert "포물선 y=x^2-3x-8" in engine.prompts[0]
 
 
 def test_planner_engine_failure_raises() -> None:
@@ -88,11 +94,12 @@ def test_ideator_uses_high_temperature_role_and_never_sees_original() -> None:
         answer_type="expression",
         domain="이차함수·도형의 이동",
         preservation_goals=["평행이동 성질"],
-        strategy=_PLANNER_DATA["strategy"],  # type: ignore[arg-type]
+        strategy=ProductionStrategy.model_validate(_PLANNER_DATA["strategy"]),
     )
     assert "y=x^2" not in brief
     idea = agent.ideate(brief, seed="a")
     assert isinstance(idea, IdeationOutput)
+    assert "y=x^2" not in engine.prompts[0]
 
 
 def test_selector_adopts_ideas() -> None:
@@ -102,6 +109,6 @@ def test_selector_adopts_ideas() -> None:
     )
     agent = SelectorAgent(engine=engine, prompt_bundle="선별 프롬프트")
     ideas = [IdeationOutput.model_validate({**_IDEA, "idea_id": f"idea-{i}"}) for i in (1, 2, 3)]
-    output = agent.select(ideas)
+    output = agent.select(ideas, "난이도 목표: 중상")
     assert isinstance(output, SelectionOutput)
     assert output.adopted_ideas == ["idea-1", "idea-3"]

@@ -15,10 +15,11 @@ class SelectorAgent:
         self.engine = engine
         self.prompt_bundle = prompt_bundle
 
-    def select(self, ideas: list[IdeationOutput], strategy_brief: str = "") -> SelectionOutput:
+    def select(self, ideas: list[IdeationOutput], strategy_brief: str) -> SelectionOutput:
         listing = "\n".join(f"- {i.idea_id}: {i.title} | {i.construction_blueprint}" for i in ideas)
-        strategy_section = f"[변형 전략]\n{strategy_brief}\n\n" if strategy_brief else ""
-        prompt = f"{self.prompt_bundle}\n\n{strategy_section}[아이디어 목록]\n{listing}"
+        prompt = (
+            f"{self.prompt_bundle}\n\n[변형 전략]\n{strategy_brief}\n\n[아이디어 목록]\n{listing}"
+        )
         data = request_structured(
             self.engine,
             request_id="selector",

@@ -5,10 +5,8 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from math_variant.agents._common import request_structured
-from math_variant.agents.schemas import IdeationOutput
+from math_variant.agents.schemas import IdeationOutput, ProductionStrategy
 from math_variant.providers.contracts import RolePolicy
 from math_variant.providers.structured import StructuredOutputEngine
 
@@ -20,7 +18,7 @@ def build_ideation_brief(
     answer_type: str,
     domain: str,
     preservation_goals: list[str],
-    strategy: dict[str, Any],
+    strategy: ProductionStrategy,
 ) -> str:
     """스펙·전략만 담은 발상 입력 브리프를 만든다 (원문 본문 없음)."""
     return (
@@ -31,10 +29,10 @@ def build_ideation_brief(
         f"- 도메인: {domain}\n"
         f"- 보존 목표: {preservation_goals}\n"
         "[변형 전략]\n"
-        f"- 난이도 목표: {strategy.get('difficulty_target')}\n"
-        f"- 변형 방향: {strategy.get('variation_direction')}\n"
-        f"- 품질 기준: {strategy.get('quality_criteria')}\n"
-        f"- 제약: {strategy.get('constraints')}"
+        f"- 난이도 목표: {strategy.difficulty_target}\n"
+        f"- 변형 방향: {strategy.variation_direction}\n"
+        f"- 품질 기준: {strategy.quality_criteria}\n"
+        f"- 제약: {strategy.constraints}"
     )
 
 
