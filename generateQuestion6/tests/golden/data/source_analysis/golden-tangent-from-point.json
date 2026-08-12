@@ -1,0 +1,19 @@
+{
+  "id": "golden-tangent-from-point-2018-gwangmun-q21",
+  "source_file": "[2018년 기출] 광문고1-2 중간 (주)_structured.json",
+  "question_number": "21",
+  "normalized_text": "점 (-6, 2)에서 원 x^2 + y^2 = 8에 그은 접선의 방정식을 구하고, 그 풀이과정을 서술하시오.",
+  "expected": {
+    "core_concepts": ["원", "접선"],
+    "auxiliary_concepts": ["좌표", "판별식"],
+    "givens": [
+      {"id": "point", "natural_language": "점 (-6, 2)"},
+      {"id": "circle", "natural_language": "원 x^2 + y^2 = 8"}
+    ],
+    "unknowns": [],
+    "objective": {"natural_language": "접선의 방정식을 구하시오"},
+    "answer_type": "expression",
+    "implicit_domain": [],
+    "unresolved_assumptions": []
+  }
+}

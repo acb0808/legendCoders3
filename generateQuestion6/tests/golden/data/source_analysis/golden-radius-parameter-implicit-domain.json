@@ -1,0 +1,19 @@
+{
+  "id": "golden-radius-parameter-implicit-domain",
+  "source_file": "[test] 구성된 골드 문제",
+  "question_number": "-",
+  "normalized_text": "원 (x - 1)^2 + (y - 2)^2 = 4 - k 와 직선 y = x 가 만나지 않도록 하는 실수 k의 범위를 구하고 그 과정을 서술하시오.",
+  "expected": {
+    "core_concepts": ["원", "직선", "교점"],
+    "auxiliary_concepts": ["거리"],
+    "givens": [
+      {"id": "circle", "natural_language": "원 (x - 1)^2 + (y - 2)^2 = 4 - k"},
+      {"id": "line", "natural_language": "직선 y = x"}
+    ],
+    "unknowns": ["k"],
+    "objective": {"natural_language": "실수 k의 범위를 구하시오"},
+    "answer_type": "interval",
+    "implicit_domain": ["4 - k > 0"],
+    "unresolved_assumptions": []
+  }
+}

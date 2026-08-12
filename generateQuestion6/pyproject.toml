@@ -1,0 +1,97 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "math-variant"
+version = "0.1.0"
+description = "공통수학2 도형의 방정식 서술형 문항 변형·생성 파이프라인 (MVP)"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+license = "LicenseRef-Proprietary"
+dependencies = [
+    "pydantic>=2.11,<3",
+    "pydantic-settings>=2.4,<3",
+    "sympy>=1.13,<1.14",
+    "PyYAML>=6.0,<7",
+    "fastapi>=0.115,<1",
+    "httpx>=0.27,<1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.4,<9",
+    "pytest-cov>=5.0,<8",
+    "hypothesis>=6.100,<7",
+    "ruff>=0.6,<1",
+    "mypy>=1.11,<2",
+    "types-PyYAML>=6.0,<7",
+]
+
+[project.scripts]
+math-variant = "math_variant.cli:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+math_variant = ["rules/*.yaml", "prompts/*.md", "fixtures/**/*.json"]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-q --strict-markers --strict-config"
+markers = [
+    "docker: 도커 격리 샌드박스가 필요한 보안 테스트 (없으면 skip)",
+    "live_provider: 실제 LLM 공급자 네트워크 호출이 필요한 테스트 (기본 skip)",
+]
+filterwarnings = ["error::DeprecationWarning:math_variant.*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # bugbear
+    "UP",  # pyupgrade
+    "S",   # bandit (보안 경계)
+    "ANN", # 타입 주석
+    "RUF",
+]
+ignore = [
+    "ANN401", # **kwargs: Any 허용
+    "RUF001", # 한국어 문서 문자열의 전각 문자 허용
+    "RUF002",
+    "RUF003",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "ANN201", "ANN001", "ANN202", "S603", "S607"]
+"infra/sandbox/runner.py" = ["S102", "ANN001", "ANN002", "ANN003", "ANN202", "ANN204", "BLE001"]
+"src/math_variant/sandbox/provider.py" = ["S603", "S607"]
+
+[tool.mypy]
+python_version = "3.12"
+mypy_path = "src"
+packages = ["math_variant"]
+strict = true
+warn_unused_ignores = true
+disallow_any_generics = true
+plugins = []
+
+[[tool.mypy.overrides]]
+module = ["sympy.*", "yaml.*"]
+ignore_missing_imports = true
+
+[tool.coverage.run]
+source = ["src/math_variant"]
+branch = true

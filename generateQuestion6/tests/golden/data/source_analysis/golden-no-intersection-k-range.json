@@ -1,0 +1,20 @@
+{
+  "id": "golden-no-intersection-k-range-2018-unsan",
+  "source_file": "[2018년 기출] 운산고1-2 중간 (주)_structured.json",
+  "question_number": "서술형1",
+  "normalized_text": "중심이 원점 O(0, 0)이고 한 점 (1, -2)를 지나는 원과 직선 y = 2x + k가 만나지 않을 때, 실수 k의 범위를 구하고 그 과정을 서술하시오.",
+  "expected": {
+    "core_concepts": ["원", "직선", "교점"],
+    "auxiliary_concepts": ["거리", "판별식"],
+    "givens": [
+      {"id": "center", "natural_language": "중심 O(0, 0)"},
+      {"id": "passing_point", "natural_language": "한 점 (1, -2)"},
+      {"id": "line", "natural_language": "직선 y = 2x + k"}
+    ],
+    "unknowns": ["k"],
+    "objective": {"natural_language": "실수 k의 범위를 구하시오"},
+    "answer_type": "interval",
+    "implicit_domain": [],
+    "unresolved_assumptions": []
+  }
+}

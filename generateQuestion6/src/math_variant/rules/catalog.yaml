@@ -1,0 +1,66 @@
+# 도형의 방정식 변형 규칙 카탈로그 (T04.1)
+# 구조화 정의는 src/math_variant/rules/geometry.py 를 단일 출처로 사용한다.
+# 이 파일은 운영 문서·디버깅용 사람이 읽는 미러이며, 검증 테스트(T04.1-UT5)에서
+# geometry.py 의 개념 ID 가 ScopeProfile 어휘와 일치하는지 함께 확인한다.
+
+rules:
+  - rule_id: RULE_LINE_TWO_POINTS
+    name: 직선을 두 점으로 표현
+    concepts: [직선, 좌표]
+    changed_dimensions: [representation, context, data_domain]
+    difficulty_delta: 0.2
+    verifier_recipe: [sympy, numeric]
+  - rule_id: RULE_LINE_GENERAL_FORM
+    name: 직선 일반형 ↔ 절편형
+    concepts: [직선]
+    changed_dimensions: [representation, data_domain]
+    difficulty_delta: 0.1
+    verifier_recipe: [sympy]
+  - rule_id: RULE_CIRCLE_CENTER_RADIUS
+    name: 원을 중심·반지름으로 표현
+    concepts: [원]
+    changed_dimensions: [representation, context, data_domain]
+    difficulty_delta: 0.2
+    verifier_recipe: [sympy]
+  - rule_id: RULE_CIRCLE_GENERAL_FORM
+    name: 원 일반형 ↔ 중심·반지름
+    concepts: [원]
+    changed_dimensions: [representation, data_domain]
+    difficulty_delta: 0.3
+    verifier_recipe: [sympy]
+  - rule_id: RULE_TANGENT_DISTANCE
+    name: 접선을 거리 조건으로
+    concepts: [원, 접선, 거리]
+    changed_dimensions: [solution_route, representation, auxiliary_construction]
+    difficulty_delta: 0.3
+    verifier_recipe: [sympy, numeric]
+  - rule_id: RULE_TANGENT_DISCRIMINANT
+    name: 접선을 판별식으로
+    concepts: [원, 접선]
+    changed_dimensions: [solution_route, representation]
+    difficulty_delta: 0.3
+    verifier_recipe: [sympy, numeric]
+  - rule_id: RULE_OBJECTIVE_INVERSION
+    name: 질문 역전
+    concepts: [방정식]
+    changed_dimensions: [objective, condition_order, context]
+    difficulty_delta: 0.4
+    verifier_recipe: [sympy]
+  - rule_id: RULE_CONDITION_TOPOLOGY
+    name: 조건 위상 변경
+    concepts: [방정식]
+    changed_dimensions: [condition_topology, condition_order, auxiliary_construction]
+    difficulty_delta: 0.3
+    verifier_recipe: [sympy]
+  - rule_id: RULE_TRANSLATION
+    name: 평행이동 적용
+    concepts: [평행이동, 방정식]
+    changed_dimensions: [data_domain, representation, context]
+    difficulty_delta: 0.2
+    verifier_recipe: [sympy]
+  - rule_id: RULE_REFLECTION
+    name: 대칭이동 적용
+    concepts: [대칭이동, 방정식]
+    changed_dimensions: [data_domain, representation, context]
+    difficulty_delta: 0.2
+    verifier_recipe: [sympy]
