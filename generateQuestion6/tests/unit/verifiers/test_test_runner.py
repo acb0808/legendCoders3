@@ -70,3 +70,18 @@ def test_outcome_is_frozen() -> None:
     outcome = VerificationOutcome(verdict=TestVerdict.PASS, status=SandboxStatus.COMPLETED)
     with pytest.raises(ValidationError):
         outcome.verdict = TestVerdict.FAIL  # type: ignore[misc]
+
+
+class _FakeProvider:
+    name = "fake"
+
+    def execute(self, request):
+        return _result(SandboxStatus.COMPLETED, {"result": {"verdict": "PASS"}})
+
+
+def test_run_verification_delegates_and_returns_pass() -> None:
+    from math_variant.verifiers.test_runner import run_verification
+
+    request = build_verification_request("req-x", "result = {'verdict': 'PASS'}", {})
+    outcome = run_verification(_FakeProvider(), request)  # type: ignore[arg-type]
+    assert outcome.verdict == TestVerdict.PASS

@@ -32,6 +32,8 @@ from math_variant.sandbox.provider import SandboxProvider
 
 
 class TestVerdict(StrEnum):
+    __test__ = False  # pytest 컬렉션 경고 방지
+
     PASS = "PASS"  # noqa: S105 - 판정 상태 코드 (비밀 아님)
     FAIL = "FAIL"
     UNRESOLVED = "UNRESOLVED"
