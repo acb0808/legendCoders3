@@ -15,6 +15,7 @@ export function ProblemPicker({
 }) {
   const [problems, setProblems] = useState<Problem[]>([]);
   const [query, setQuery] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -24,7 +25,11 @@ export function ProblemPicker({
           setProblems(data);
         }
       })
-      .catch(() => {});
+      .catch((reason: unknown) => {
+        if (!cancelled) {
+          setError(reason instanceof Error ? reason.message : String(reason));
+        }
+      });
     return () => {
       cancelled = true;
     };
@@ -40,6 +45,7 @@ export function ProblemPicker({
 
   return (
     <div className="problem-picker">
+      {error && <p className="problems-error">{error}</p>}
       <input
         type="search"
         placeholder="문제 검색"
@@ -55,12 +61,10 @@ export function ProblemPicker({
       >
         <option value="">문제를 선택하세요</option>
         {filtered.map((problem) => (
-          <option
-            key={problem.problem_id}
-            value={problem.problem_id}
-            onClick={() => onSelect(problem.problem_id)}
-          >
-            {problem.text.slice(0, 40)}
+          <option key={problem.problem_id} value={problem.problem_id} title={problem.text}>
+            {problem.title
+              ? `${problem.title} — ${problem.text.slice(0, 40)}`
+              : problem.text.slice(0, 40)}
           </option>
         ))}
       </select>

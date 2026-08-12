@@ -23,7 +23,11 @@ describe("CreateForm (T08 생성 화면)", () => {
     await waitFor(() => {
       expect(api.createGeneration).toHaveBeenCalledWith(
         expect.objectContaining({ mode: "text", text: "포물선 y=x^2 의 접선" }),
-        expect.objectContaining({ ideator_count: 3 }),
+        expect.objectContaining({
+          difficulty_target: "",
+          ideator_count: 3,
+          max_refine: 2,
+        }),
       );
     });
     await waitFor(() => expect(push).toHaveBeenCalledWith("/runs/run-1/progress"));
@@ -39,5 +43,17 @@ describe("CreateForm (T08 생성 화면)", () => {
     render(<CreateForm onNavigate={() => {}} />);
     await userEvent.click(screen.getByRole("button", { name: /생성 시작/ }));
     expect(create).not.toHaveBeenCalled();
+  });
+
+  it("생성 요청이 실패하면 오류 메시지를 표시한다", async () => {
+    vi.spyOn(api, "listProblems").mockResolvedValue([]);
+    vi.spyOn(api, "createGeneration").mockRejectedValue(new Error("생성 실패"));
+    render(<CreateForm onNavigate={() => {}} />);
+
+    await userEvent.type(screen.getByLabelText(/문제 본문/), "포물선 y=x^2 의 접선");
+    await userEvent.click(screen.getByRole("button", { name: /생성 시작/ }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("생성 실패");
   });
 });

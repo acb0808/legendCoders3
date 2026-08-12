@@ -53,11 +53,11 @@ export function CreateForm({ onNavigate }: { onNavigate: (path: string) => void 
         <legend>원문제 입력</legend>
         <div className="create-mode-row">
           <label>
-            <input type="radio" checked={mode === "text"} onChange={() => setMode("text")} />
+            <input type="radio" name="source-mode" checked={mode === "text"} onChange={() => setMode("text")} />
             텍스트 붙여넣기
           </label>
           <label>
-            <input type="radio" checked={mode === "problem"} onChange={() => setMode("problem")} />
+            <input type="radio" name="source-mode" checked={mode === "problem"} onChange={() => setMode("problem")} />
             기존 문제에서 선택
           </label>
         </div>
@@ -108,7 +108,11 @@ export function CreateForm({ onNavigate }: { onNavigate: (path: string) => void 
         </label>
       </fieldset>
 
-      {error && <p className="create-error">{error}</p>}
+      {error && (
+        <p className="create-error" role="alert">
+          {error}
+        </p>
+      )}
 
       <div className="create-actions">
         <Link className="create-cancel" href="/">

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -13,9 +13,20 @@ describe("ProblemPicker (T08)", () => {
     ]);
     const onSelect = vi.fn();
     render(<ProblemPicker value="" onSelect={onSelect} />);
-    await waitFor(() => expect(screen.getByRole("combobox")).toBeInTheDocument());
+    await screen.findByRole("option", { name: "포물선 — 포물선 문제" });
+    expect(screen.getAllByRole("option")).toHaveLength(3); // placeholder + 2
     await userEvent.type(screen.getByPlaceholderText(/검색/), "포물선");
-    await userEvent.click(screen.getByText("포물선 문제"));
+    const filtered = screen.getAllByRole("option");
+    expect(filtered.map((o) => o.textContent)).toEqual(["문제를 선택하세요", "포물선 — 포물선 문제"]);
+    await userEvent.selectOptions(screen.getByRole("combobox"), "p1");
     expect(onSelect).toHaveBeenCalledWith("p1");
+  });
+
+  it("문제 목록을 불러오지 못하면 오류를 표시한다", async () => {
+    vi.spyOn(api, "listProblems").mockRejectedValue(new Error("서버 오류"));
+    render(<ProblemPicker value="" onSelect={() => {}} />);
+    const alert = await screen.findByText(/서버 오류/);
+    expect(alert).toBeInTheDocument();
+    expect(alert.className).toBe("problems-error");
   });
 });
