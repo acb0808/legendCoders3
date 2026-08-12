@@ -37,7 +37,7 @@ class GeneratorAgent:
         output = GeneratorOutput.model_validate(data)
         candidate = CandidateProblem(
             candidate_id=candidate_id,
-            plan_id=f"plan-{blueprint.get('title', 'llm')}",
+            plan_id=f"plan-{blueprint.get('idea_id') or 'llm'}",
             problem_text=output.problem_text,
             formalization=output.formalization,
             final_answer_claim=output.final_answer_claim,

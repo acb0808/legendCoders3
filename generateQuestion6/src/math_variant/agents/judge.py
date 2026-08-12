@@ -18,14 +18,14 @@ class JudgeAgent:
         self.engine = engine
         self.prompt_bundle = prompt_bundle
 
-    def judge(self, entries: list[dict[str, Any]]) -> JudgeOutput:
+    def judge(self, entries: list[dict[str, Any]], run_id: str = "judge") -> JudgeOutput:
         prompt = (
             f"{self.prompt_bundle}\n\n"
             f"[후보 검증 결과]\n{json.dumps(entries, ensure_ascii=False, indent=2)}"
         )
         data = request_structured(
             self.engine,
-            request_id="judge",
+            request_id=run_id,
             role=RolePolicy.JUDGE,
             prompt=prompt,
             schema="JudgeOutput",

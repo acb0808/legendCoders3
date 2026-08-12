@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
+import pytest
+
 from math_variant.agents.code_reviewer import CodeReviewAgent
 from math_variant.agents.critic import CriticAgent
 from math_variant.agents.generator import GeneratorAgent
@@ -13,6 +17,7 @@ from math_variant.agents.schemas import (
 )
 from math_variant.agents.vision_artist import VisionArtist
 from math_variant.domain.candidate import CandidateProblem
+from math_variant.errors import MathVariantError
 from math_variant.providers.contracts import ProviderResponse, RolePolicy
 from math_variant.providers.registry import SchemaRegistry
 from math_variant.providers.structured import StructuredOutputEngine
@@ -65,6 +70,16 @@ class _Engine(StructuredOutputEngine):
         return ProviderResponse(request_id=request.request_id, ok=True, data=self._data)
 
 
+class _BrokenEngine(StructuredOutputEngine):
+    def __init__(self, data: dict, roles: set[str]) -> None:
+        super().__init__(primary=None, fallback=None, schemas=SchemaRegistry())
+        self._data = data
+        self._roles = roles
+
+    def generate_structured(self, request, policy=None) -> ProviderResponse:
+        return ProviderResponse(request_id=request.request_id, ok=False)
+
+
 def test_generator_assembles_candidate_with_script() -> None:
     engine = _Engine(_CANDIDATE, {"generator"})
     agent = GeneratorAgent(engine=engine, prompt_bundle="생성 프롬프트")
@@ -90,7 +105,7 @@ def test_generator_refine_includes_feedback_in_prompt() -> None:
 def test_code_reviewer_returns_review() -> None:
     engine = _Engine(_REVIEW, {"code_reviewer"})
     agent = CodeReviewAgent(engine=engine, prompt_bundle="심사 프롬프트")
-    review = agent.review("script", "문제 본문", "8sqrt(2)")
+    review = agent.review("script", "문제 본문", "8sqrt(2)", candidate_id="cand-1")
     assert isinstance(review, CodeReviewOutput)
     assert review.approves
 
@@ -98,16 +113,36 @@ def test_code_reviewer_returns_review() -> None:
 def test_critic_and_judge() -> None:
     engine = _Engine(_CRITIC, {"critic"})
     critic = CriticAgent(engine=engine, prompt_bundle="비평 프롬프트")
-    assert isinstance(critic.criticize("문제", "스펙", "전략"), CriticOutput)
+    assert isinstance(critic.criticize("문제", "스펙", "전략", candidate_id="cand-1"), CriticOutput)
 
     engine_j = _Engine(_JUDGE, {"judge"})
     judge = JudgeAgent(engine=engine_j, prompt_bundle="집계 프롬프트")
-    assert isinstance(judge.judge([{"candidate_id": "c1", "score": 8.0}]), JudgeOutput)
+    result = judge.judge([{"candidate_id": "c1", "score": 8.0}], run_id="run-1")
+    assert isinstance(result, JudgeOutput)
 
 
 def test_vision_artist_writes_tikz(tmp_path) -> None:
-    engine = _Engine({"tikz_code": r"\draw (0,0) -- (1,1);", "caption": "포물선"}, {"vision"})
+    engine = _Engine(
+        {"tikz_code": "```python\n\\draw (0,0) -- (1,1);\n```", "caption": "포물선"}, {"vision"}
+    )
     artist = VisionArtist(engine=engine, prompt_bundle="도형 프롬프트", figures_dir=tmp_path)
     path = artist.render("cand-1", figure_notes="포물선과 직선")
+    text = path.read_text(encoding="utf-8")
     assert path.name == "cand-1.tex"
-    assert path.read_text(encoding="utf-8").startswith("%")
+    assert text.startswith("%")
+    assert "```" not in text
+    assert "\\draw (0,0) -- (1,1);" in text
+
+
+def test_all_agents_raise_agent_unresolved_on_engine_failure() -> None:
+    cases = [
+        ("generator", lambda e: GeneratorAgent(e, "p").generate("cand-1", _BLUEPRINT, "브리프")),
+        ("code_reviewer", lambda e: CodeReviewAgent(e, "p").review("s", "q", "a")),
+        ("critic", lambda e: CriticAgent(e, "p").criticize("q", "스펙", "전략")),
+        ("judge", lambda e: JudgeAgent(e, "p").judge([{"candidate_id": "c1"}])),
+        ("vision", lambda e: VisionArtist(e, "p", Path("tmp")).render("cand-1", "노트")),
+    ]
+    for name, call in cases:
+        with pytest.raises(MathVariantError) as exc_info:
+            call(_BrokenEngine({}, set()))
+        assert exc_info.value.code == "AGENT_UNRESOLVED", name

@@ -15,7 +15,9 @@ class CriticAgent:
         self.engine = engine
         self.prompt_bundle = prompt_bundle
 
-    def criticize(self, problem_text: str, spec_brief: str, strategy_brief: str) -> CriticOutput:
+    def criticize(
+        self, problem_text: str, spec_brief: str, strategy_brief: str, candidate_id: str = "critic"
+    ) -> CriticOutput:
         prompt = (
             f"{self.prompt_bundle}\n\n"
             f"[문제 후보]\n{problem_text}\n"
@@ -24,7 +26,7 @@ class CriticAgent:
         )
         data = request_structured(
             self.engine,
-            request_id="critic",
+            request_id=candidate_id,
             role=RolePolicy.CRITIC,
             prompt=prompt,
             schema="CriticOutput",
