@@ -18,7 +18,6 @@ from math_variant.tooling.quality import BACKEND_GATES, FRONTEND_GATES, check_de
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 _DEFAULT_SOURCE = "시험지/[2023년 기출] 광명북고1-2 중간 (주)_structured.json"
-PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
 
 
 def _argv(command: str) -> list[str]:
@@ -271,57 +270,20 @@ def run_pipeline(argv: list[str] | None = None) -> int:
         print(f"문항 없음: {args.question_number}", file=sys.stderr)
         return 1
 
-    from math_variant.agents.blind import LLMBlindSolver
-    from math_variant.agents.code_reviewer import CodeReviewAgent
-    from math_variant.agents.critic import CriticAgent
-    from math_variant.agents.generator import GeneratorAgent
-    from math_variant.agents.ideator import IdeatorAgent
-    from math_variant.agents.judge import JudgeAgent
-    from math_variant.agents.pipeline import AgentPipeline
-    from math_variant.agents.planner import PlannerAgent
-    from math_variant.agents.schemas import register_agent_schemas
-    from math_variant.agents.selector import SelectorAgent
-    from math_variant.agents.vision_artist import VisionArtist
     from math_variant.errors import MathVariantError
-    from math_variant.providers.factory import build_provider_registry
-    from math_variant.providers.registry import SchemaRegistry
-    from math_variant.providers.resolver import RoleResolver
-    from math_variant.providers.settings import ProviderSettings
-    from math_variant.providers.structured import StructuredOutputEngine
-    from math_variant.sandbox.provider import DockerSandboxProvider
-    from math_variant.services.blind_solver import BlindSolver
+    from math_variant.pipeline_factory import build_agent_pipeline
     from math_variant.services.normalize import normalize_source
 
-    settings = ProviderSettings()
-    registry = build_provider_registry(settings)
-    schemas = SchemaRegistry()
-    register_agent_schemas(schemas)
-    resolver = RoleResolver(settings.role_policy(), registry)
-    engine = StructuredOutputEngine(primary=None, fallback=None, schemas=schemas)
-    engine.role_resolver = resolver
-
-    def _prompt(name: str) -> str:
-        return (PROMPTS_DIR / name).read_text(encoding="utf-8")
-
-    figures_dir = Path("runs") / "figures"
-    pipeline = AgentPipeline(
-        planner=PlannerAgent(engine, _prompt("planner.md")),
-        ideator=IdeatorAgent(engine, _prompt("ideator.md")),
-        selector=SelectorAgent(engine, _prompt("selector.md")),
-        generator=GeneratorAgent(engine, _prompt("candidate_generator.md")),
-        code_reviewer=CodeReviewAgent(engine, _prompt("code_reviewer.md")),
-        critic=CriticAgent(engine, _prompt("critic.md")),
-        judge=JudgeAgent(engine, _prompt("judge.md")),
-        vision=VisionArtist(engine, _prompt("vision.md"), figures_dir),
-        sandbox=DockerSandboxProvider(image="math-variant-sandbox:test"),
-        blind_solvers=BlindSolver(
-            LLMBlindSolver(engine, _prompt("blind_solver.md"), "A"),
-            LLMBlindSolver(engine, _prompt("blind_solver.md"), "B"),
-            {"원문 정답": str(question.get("answer") or ""), "해설": ""},
-        ),
-        runs_dir=Path("runs"),
+    pipeline = build_agent_pipeline(
+        source_text=question["question_text"],
+        difficulty_target="",
         ideator_count=3,
         max_refine=2,
+        on_event=None,
+        runs_dir=Path("runs"),
+        figures_dir=Path("runs") / "figures",
+        sandbox_image="math-variant-sandbox:test",
+        forbidden_context={"원문 정답": str(question.get("answer") or ""), "해설": ""},
     )
 
     try:
