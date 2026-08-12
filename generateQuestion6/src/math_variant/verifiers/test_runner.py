@@ -107,7 +107,7 @@ def interpret(result: SandboxResult) -> VerificationOutcome:
             duration_ms=result.duration_ms,
         )
     payload = result.output_json or {}
-    inner = payload.get("result")
+    inner = payload.get("result") if isinstance(payload.get("result"), dict) else payload
     if isinstance(inner, dict) and inner.get("verdict") == "PASS":
         return VerificationOutcome(
             verdict=TestVerdict.PASS,
