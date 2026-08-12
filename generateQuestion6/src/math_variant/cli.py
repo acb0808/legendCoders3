@@ -275,8 +275,6 @@ def run_pipeline(argv: list[str] | None = None) -> int:
     from math_variant.services.normalize import normalize_source
 
     pipeline = build_agent_pipeline(
-        source_text=question["question_text"],
-        difficulty_target="",
         ideator_count=3,
         max_refine=2,
         on_event=None,

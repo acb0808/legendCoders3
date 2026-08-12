@@ -33,8 +33,6 @@ PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
 
 def build_agent_pipeline(
     *,
-    source_text: str,
-    difficulty_target: str = "",
     ideator_count: int = 3,
     max_refine: int = 2,
     on_event: Callable[[PipelineEvent], None] | None = None,
@@ -43,7 +41,14 @@ def build_agent_pipeline(
     sandbox_image: str = "math-variant-sandbox:test",
     forbidden_context: dict[str, str] | None = None,
 ) -> AgentPipeline:
-    """설정·공급자·에이전트를 묶어 AgentPipeline 을 구성한다."""
+    """설정·공급자·에이전트를 묶어 AgentPipeline 을 구성한다.
+
+    NOTE: `runs_dir` 은 반드시 JOB 단위 고유 디렉터리여야 한다.
+    AgentPipeline._write_report 가 `runs_dir/report.json` 에 무조건 쓰므로,
+    웹 레이어가 여러 job 을 동시에 실행하면 서로 report.json 을 덮어쓴다.
+    CLI 단발 실행은 `Path("runs")` 로 충분하지만, 웹 워커는 실행마다
+    per-run 디렉터리를 만들어 넘겨야 한다 (실제 per-job 배선은 Task 8).
+    """
     settings = ProviderSettings()
     registry = build_provider_registry(settings)
     schemas = SchemaRegistry()
