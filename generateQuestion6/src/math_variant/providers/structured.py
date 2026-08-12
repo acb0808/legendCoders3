@@ -28,6 +28,14 @@ from math_variant.providers.resolver import RoleResolver
 
 _SECRET_PATTERN = re.compile(r"(sk-[A-Za-z0-9_\-]{6,}|AIza[A-Za-z0-9_\-]{6,}|[A-Za-z0-9_\-]{32,})")
 
+# 일시적 공급자 오류 — 복구 프롬프트 없이 원본 그대로 재시도할 수 있는 코드.
+_TRANSIENT_ERROR_CODES = frozenset(
+    {
+        ProviderErrorCode.EMPTY_RESPONSE,
+        ProviderErrorCode.INFRA_ERROR,
+    }
+)
+
 
 def redact_secrets(text: str) -> str:
     """로그에서 API 키류 문자열을 마스킹한다."""
@@ -46,11 +54,13 @@ class StructuredOutputEngine:
         logger: logging.Logger | None = None,
         role_resolver: RoleResolver | None = None,
         on_event: Callable[[PipelineEvent], None] | None = None,
+        max_transient_retries: int = 2,
     ) -> None:
         self.primary = primary
         self.fallback = fallback
         self.schemas = schemas
         self.max_repair_attempts = max(0, min(1, max_repair_attempts))
+        self.max_transient_retries = max(0, min(3, max_transient_retries))
         self.logger = logger or logging.getLogger("math_variant.providers")
         self.role_resolver = role_resolver
         self.on_event = on_event
@@ -86,6 +96,7 @@ class StructuredOutputEngine:
 
         fallback_used = False
         repair_used = 0
+        transient_retries = 0
         attempts = 0
         last_error: ProviderError | None = None
         latency = 0
@@ -95,6 +106,8 @@ class StructuredOutputEngine:
         while provider is not None:
             attempts += 1
             prompt = request.prompt
+            # 스키마 복구는 직전 실패가 스키마 오류였을 때만 붙인다. 빈 응답은 복구 프롬프트가
+            # 오히려 해가 되므로 원본 그대로 재시도한다. (T08)
             if repair_used > 0 and last_error is not None:
                 prompt = self._repair_prompt(request.prompt, last_error)
 
@@ -160,9 +173,29 @@ class StructuredOutputEngine:
                         update={"provider": final_provider, "attempt": attempts}
                     )
 
-            # 복구는 primary(resolver 포함) 에 대해 1회, 폴백은 한 번만.
+            # 빈 응답·인프라 오류 같은 일시적 실패는 원본 프롬프트로 최대 N 회 재시도한다.
             if (
-                repair_used < self.max_repair_attempts
+                last_error is not None
+                and last_error.code in _TRANSIENT_ERROR_CODES
+                and transient_retries < self.max_transient_retries
+            ):
+                transient_retries += 1
+                self.logger.info(
+                    "transient_retry",
+                    extra={
+                        "request_id": request.request_id,
+                        "code": last_error.code.value,
+                        "retry": transient_retries,
+                    },
+                )
+                continue
+
+            # 복구는 스키마 오류에 대해서만 primary(resolver 포함) 에 대해 1회. 빈 응답은
+            # 복구 프롬프트가 무의미하므로 재시도 소진 후 바로 중단한다.
+            if (
+                last_error is not None
+                and last_error.code not in _TRANSIENT_ERROR_CODES
+                and repair_used < self.max_repair_attempts
                 and not fallback_used
                 and provider is not fallback
             ):

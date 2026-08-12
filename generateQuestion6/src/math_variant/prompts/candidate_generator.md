@@ -15,12 +15,37 @@
   풀이 단계(solution_steps), 변형 근거(transformation_evidence)를 분리해 반환한다.
 - 주장 답과 해설은 검증 전 값이므로 단정하지 않는다.
 
-## 출력 스키마
-- problem_text: 변형된 문제 본문
-- formalization: {symbols, constraints, goal}
-- final_answer_claim: 검증 전 주장 답
-- solution_steps: [{step_id, statement, justification}]
-- transformation_evidence: [{dimension, description}]
+## 출력 스키마 (JSON — 반드시 아래 타입과 형태를 지킨다)
+
+모든 배열 필드는 반드시 JSON 배열로 출력한다. 목록이 1개여도 `[ ... ]` 형태로 감싼다.
+
+```json
+{
+  "problem_text": "변형된 문제 본문",
+  "formalization": {"symbols": ["x"], "constraints": [], "goal": "a의 값"},
+  "final_answer_claim": "8",
+  "solution_steps": [
+    {"step_id": "s1", "statement": "조건을 식으로 나타낸다", "justification": ""}
+  ],
+  "transformation_evidence": [
+    {"dimension": "objective", "description": "질문을 역전한다"}
+  ],
+  "verification_script": "from sympy import symbols\nresult = {'verdict': 'PASS', 'detail': '통과'}",
+  "needs_figure": false,
+  "figure_notes": ""
+}
+```
+
+- problem_text: 문자열, 최소 1자
+- formalization.symbols: 배열 (없으면 빈 배열)
+- formalization.constraints: 배열 (없으면 빈 배열)
+- formalization.goal: 문자열
+- final_answer_claim: 문자열, 최소 1자
+- solution_steps: 배열, 각 항목은 {step_id, statement, justification}
+- transformation_evidence: 배열, 각 항목은 {dimension, description}
+- verification_script: 문자열, 아래 검증 스크립트 계약 참고
+- needs_figure: true 또는 false
+- figure_notes: 문자열, 도형이 필요하면 설명, 아니면 빈 문자열
 
 ## 검증 스크립트
 - verification_script: 문제의 주장 답(final_answer_claim)을 sympy 로 독립 검증하는

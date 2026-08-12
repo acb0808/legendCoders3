@@ -13,7 +13,36 @@
 - 다음 단계(발상·선별·생성)는 원문을 보지 못한다. 변형 방향·보존 목표·품질 기준을
   스펙/전략으로 충분히 전달 가능하게 작성한다.
 
-## 출력 스키마
-- core_concepts, auxiliary_concepts, objective, answer_type, domain,
-  preservation_goals, strategy{difficulty_target, preservation_goals,
-  variation_direction, quality_criteria, constraints}, unresolved_assumptions
+## 출력 스키마 (JSON — 반드시 아래 타입을 지킨다)
+
+모든 "목록" 필드는 반드시 JSON 배열(list of strings)로 출력한다.
+단일 문자열이 아니라 배열로 감싸야 한다. 목록이 1개여도 `["항목"]` 형태로 출력한다.
+
+```json
+{
+  "core_concepts": ["포물선"],
+  "auxiliary_concepts": ["교점"],
+  "objective": "상수의 값을 구하시오",
+  "answer_type": "expression",
+  "domain": "도형의 방정식",
+  "preservation_goals": ["평행이동 성질"],
+  "strategy": {
+    "difficulty_target": "중상",
+    "preservation_goals": ["평행이동 성질"],
+    "variation_direction": ["질문 역전", "조건 일반화"],
+    "quality_criteria": ["유일해", "범위 내 개념"],
+    "constraints": []
+  },
+  "unresolved_assumptions": []
+}
+```
+
+- core_concepts: 배열(list of strings), 최소 1개
+- auxiliary_concepts: 배열, 없으면 빈 배열
+- preservation_goals: 배열, 최소 1개
+- strategy.preservation_goals: 배열, 최소 1개
+- strategy.variation_direction: 배열, 최소 1개
+- strategy.quality_criteria: 배열, 최소 1개
+- strategy.constraints: 배열, 없으면 빈 배열
+- unresolved_assumptions: 배열, 없으면 빈 배열
+- 그 외 모든 문자열 필드는 JSON 문자열이어야 한다.

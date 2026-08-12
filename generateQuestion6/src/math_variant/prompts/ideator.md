@@ -17,6 +17,31 @@
   구조를 골라 4개 이상 제시한다.
 - 단순 숫자 치환은 금지. 도형이 필요한 경우 figure_required=true 와 figure_notes 를 채운다.
 
-## 출력 스키마
-- idea_id, title, preserved_concepts, changed_dimensions, change_description,
-  construction_blueprint, figure_required, figure_notes
+## 출력 스키마 (JSON — 반드시 아래 타입을 지킨다)
+
+모든 "목록" 필드는 반드시 JSON 배열(list of strings)로 출력한다.
+단일 문자열이 아니라 배열로 감싸야 한다. 목록이 1개여도 `["항목"]` 형태로 출력한다.
+
+```json
+{
+  "idea_id": "idea-0",
+  "title": "질문 역전",
+  "preserved_concepts": ["평행이동"],
+  "changed_dimensions": ["objective", "condition_topology", "solution_route", "data_domain"],
+  "change_description": ["질문을 역전한다"],
+  "construction_blueprint": "a를 주고 조건을 만족하는 값을 구하게 한다",
+  "figure_required": false,
+  "figure_notes": ""
+}
+```
+
+- idea_id: 문자열 (예: "idea-0")
+- title: 문자열, 최소 1자
+- preserved_concepts: 배열, 최소 1개
+- changed_dimensions: 배열, 반드시 아래 값 중 4개 이상
+  (context / representation / data_domain / objective / condition_topology /
+  condition_order / auxiliary_construction / solution_route)
+- change_description: 배열, 최소 1개
+- construction_blueprint: 문자열, 최소 1자
+- figure_required: true 또는 false
+- figure_notes: 문자열, 도형이 필요하면 설명, 아니면 빈 문자열

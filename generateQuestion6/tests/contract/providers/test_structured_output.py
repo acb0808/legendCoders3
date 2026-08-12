@@ -104,6 +104,7 @@ def test_ct2_empty_truncated_extra_fields_are_structured_errors() -> None:
             fallback=None,
             schemas=_registry(),
             max_repair_attempts=0,
+            max_transient_retries=0,  # 파싱 분류만 직접 검증 (T08 transient 재시도 분리)
         )
         response = engine.generate_structured(
             StructuredRequest(

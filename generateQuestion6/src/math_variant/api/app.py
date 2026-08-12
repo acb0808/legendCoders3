@@ -161,9 +161,7 @@ class PipelineRunner:
             run_data = report_to_run_store(report)
             run_data["run_id"] = job_id
             self.store.save_run(job_id, run_data)
-            self.jobs.complete(
-                job_id, {"run_id": job_id, "candidates": len(report.candidates)}
-            )
+            self.jobs.complete(job_id, {"run_id": job_id, "candidates": len(report.candidates)})
         finally:
             _clear_active(job_id)
 
