@@ -83,6 +83,20 @@ def test_create_generation_requires_source_text(client: TestClient) -> None:
     assert response.status_code == 422
 
 
+def test_create_generation_invalid_options_returns_422(client: TestClient) -> None:
+    response = client.post(
+        "/api/generations",
+        json={"source": {"mode": "text", "text": "원문"}, "options": {"ideator_count": 99}},
+    )
+    assert response.status_code == 422
+    # 이후 정상 요청도 성공해야 한다 (락 유출 없음)
+    ok = client.post(
+        "/api/generations",
+        json={"source": {"mode": "text", "text": "원문"}, "options": {}},
+    )
+    assert ok.status_code == 200
+
+
 def test_create_generation_concurrent_rejected(client: TestClient) -> None:
     client.post(
         "/api/generations",

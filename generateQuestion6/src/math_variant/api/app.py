@@ -105,9 +105,7 @@ class PipelineRunner:
         self.sandbox_image = sandbox_image
 
     def start(self, job_id: str, source_text: str, options: dict[str, Any]) -> None:
-        import threading as _threading
-
-        thread = _threading.Thread(
+        thread = threading.Thread(
             target=self._execute,
             args=(job_id, source_text, options),
             daemon=True,
@@ -119,8 +117,8 @@ class PipelineRunner:
         from math_variant.pipeline_factory import build_agent_pipeline
         from math_variant.services.normalize import normalize_source
 
-        self.jobs.set_status(job_id, "running")
         try:
+            self.jobs.set_status(job_id, "running")
             pipeline = build_agent_pipeline(
                 ideator_count=int(options.get("ideator_count", 3)),
                 max_refine=int(options.get("max_refine", 2)),
@@ -188,7 +186,7 @@ class GenerationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     source: SourcePayload
-    options: dict[str, Any] = Field(default_factory=dict)
+    options: CreateOptions = Field(default_factory=CreateOptions)
 
 
 class ProblemRequest(BaseModel):
@@ -284,10 +282,18 @@ def create_generation(payload: GenerationRequest) -> dict[str, Any]:
         label = problem.title or problem.problem_id
     if not _try_acquire_active():
         raise HTTPException(status_code=409, detail="다른 생성 작업이 실행 중이다")
-    options = CreateOptions.model_validate(payload.options)
-    job = _default_jobs().create(text, options, source_mode=source.mode, source_label=label)
-    _set_active(job.job_id)
-    _default_runner().start(job.job_id, text, options.model_dump())
+    options = payload.options
+    try:
+        job = _default_jobs().create(text, options, source_mode=source.mode, source_label=label)
+    except Exception:
+        _clear_active("pending")
+        raise
+    try:
+        _set_active(job.job_id)
+        _default_runner().start(job.job_id, text, options.model_dump())
+    except Exception:
+        _clear_active(job.job_id)
+        raise
     return {"job_id": job.job_id, "run_id": job.run_id, "status": job.status}
 
 

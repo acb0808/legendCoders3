@@ -54,3 +54,38 @@ def test_approved_lists_approved_only(client: TestClient) -> None:
     approved = client.get("/api/approved").json()
     assert len(approved) == 1
     assert approved[0]["source_run_id"] == "run-1"
+
+
+def test_approve_candidate_registers_problem(client: TestClient) -> None:
+    api_module._default_store().save_run(
+        "run-approve",
+        {
+            "run_id": "run-approve",
+            "state": "TOOL_VERIFIED",
+            "created_at": "2026-01-01T00:00:00+00:00",
+            "updated_at": "2026-01-01T00:00:00+00:00",
+            "candidates": [
+                {
+                    "candidate_id": "cand-1",
+                    "plan_id": "plan-1",
+                    "problem_text": "승인된 문제",
+                    "formalization": {"symbols": ["x"], "constraints": [], "goal": "목표"},
+                    "final_answer_claim": "답",
+                    "solution_steps": [{"step_id": "s1", "statement": "단계"}],
+                    "transformation_evidence": [{"dimension": "representation"}],
+                    "verification_status": "PASS",
+                    "rubric": {"items": [{"score": 4}]},
+                    "evidence": {"checks": [{"status": "PASS"}]},
+                }
+            ],
+        },
+    )
+    response = client.post(
+        "/api/runs/run-approve/candidates/cand-1/decision",
+        json={"decision": "approved", "reject_reason_code": None},
+    )
+    assert response.status_code == 201
+    approved = client.get("/api/approved").json()
+    assert len(approved) == 1
+    assert approved[0]["source"] == "approved"
+    assert approved[0]["source_run_id"] == "run-approve"
