@@ -149,9 +149,15 @@ def test_pipeline_emits_stage_events_in_order(tmp_path) -> None:
     started = [e for e in events if e.type == "stage" and e.status == "started"]
     order = [e.stage for e in started]
     expected = [
-        EventStage.PLANNER, EventStage.IDEATION, EventStage.SELECTION,
-        EventStage.GENERATION, EventStage.CODE_REVIEW, EventStage.SANDBOX,
-        EventStage.BLIND, EventStage.CRITIC, EventStage.JUDGE,
+        EventStage.PLANNER,
+        EventStage.IDEATION,
+        EventStage.SELECTION,
+        EventStage.GENERATION,
+        EventStage.CODE_REVIEW,
+        EventStage.SANDBOX,
+        EventStage.BLIND,
+        EventStage.CRITIC,
+        EventStage.JUDGE,
     ]
     assert order == expected
 

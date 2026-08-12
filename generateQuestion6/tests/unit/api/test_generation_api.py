@@ -27,19 +27,35 @@ class _FakeRunner:
         store.append_event(
             job_id,
             PipelineEvent(
-                event_id="e1", type="stage", stage=EventStage.PLANNER,
-                status="done", message="기획 완료", ts=datetime.now(UTC),
+                event_id="e1",
+                type="stage",
+                stage=EventStage.PLANNER,
+                status="done",
+                message="기획 완료",
+                ts=datetime.now(UTC),
             ),
         )
         store.append_event(
             job_id,
             PipelineEvent(
-                event_id="e2", type="llm_call", stage=EventStage.PLANNER,
-                status="done", ts=datetime.now(UTC),
-                data={"role": "planner", "schema": "PlannerOutput", "provider": "fake",
-                      "model": "m", "temperature": 0.2, "attempts": 1,
-                      "latency_ms": 5, "cost_usd": 0.0, "ok": True,
-                      "summary": {"core_concepts": ["포물선"]}, "error": None},
+                event_id="e2",
+                type="llm_call",
+                stage=EventStage.PLANNER,
+                status="done",
+                ts=datetime.now(UTC),
+                data={
+                    "role": "planner",
+                    "schema": "PlannerOutput",
+                    "provider": "fake",
+                    "model": "m",
+                    "temperature": 0.2,
+                    "attempts": 1,
+                    "latency_ms": 5,
+                    "cost_usd": 0.0,
+                    "ok": True,
+                    "summary": {"core_concepts": ["포물선"]},
+                    "error": None,
+                },
             ),
         )
         store.complete(job_id, {"run_id": job_id, "candidates": 1})

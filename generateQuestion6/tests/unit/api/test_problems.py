@@ -97,9 +97,7 @@ def test_register_approved_stores_run_ref(tmp_path: Path) -> None:
     store = _store(tmp_path)
     problem = store.register("본문", source="approved", source_run_id="run-abc")
     assert problem.source_run_id == "run-abc"
-    assert problem.text_hash == hashlib.sha256(
-        normalize_source("본문").encode("utf-8")
-    ).hexdigest()
+    assert problem.text_hash == hashlib.sha256(normalize_source("본문").encode("utf-8")).hexdigest()
 
 
 def test_problem_not_found_raises(tmp_path: Path) -> None:

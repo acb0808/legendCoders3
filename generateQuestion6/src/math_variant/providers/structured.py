@@ -134,9 +134,15 @@ class StructuredOutputEngine:
                         },
                     )
                     self._emit_llm_call(
-                        request, resolved_policy, ok=True, data=data,
-                        final_provider=final_provider, attempts=attempts,
-                        latency=latency, cost=cost, error=None,
+                        request,
+                        resolved_policy,
+                        ok=True,
+                        data=data,
+                        final_provider=final_provider,
+                        attempts=attempts,
+                        latency=latency,
+                        cost=cost,
+                        error=None,
                     )
                     return ProviderResponse(
                         request_id=request.request_id,
@@ -183,9 +189,15 @@ class StructuredOutputEngine:
             },
         )
         self._emit_llm_call(
-            request, resolved_policy, ok=False, data=None,
-            final_provider=final_provider, attempts=attempts,
-            latency=latency, cost=cost, error=last_error,
+            request,
+            resolved_policy,
+            ok=False,
+            data=None,
+            final_provider=final_provider,
+            attempts=attempts,
+            latency=latency,
+            cost=cost,
+            error=last_error,
         )
         return ProviderResponse(
             request_id=request.request_id,

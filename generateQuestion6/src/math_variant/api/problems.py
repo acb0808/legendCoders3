@@ -72,9 +72,7 @@ class ProblemStore:
             raise ValueError("문제 텍스트가 비어 있다")
         text_hash = hashlib.sha256(normalize_source(text).encode("utf-8")).hexdigest()
         with self._lock:
-            existing = next(
-                (p for p in self.list_problems() if p.text_hash == text_hash), None
-            )
+            existing = next((p for p in self.list_problems() if p.text_hash == text_hash), None)
             if existing is not None:
                 return existing
             problem = Problem(

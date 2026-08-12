@@ -247,8 +247,7 @@ def decide(
         except RunNotFoundError:
             run_data = {}
         candidate_data = next(
-            (c for c in run_data.get("candidates", [])
-             if c.get("candidate_id") == candidate_id),
+            (c for c in run_data.get("candidates", []) if c.get("candidate_id") == candidate_id),
             None,
         )
         if candidate_data and candidate_data.get("problem_text"):
