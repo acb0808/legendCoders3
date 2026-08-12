@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import threading
 import uuid
-from builtins import list as builtin_list
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
@@ -39,19 +39,20 @@ class ProblemStore:
     def __init__(self, base_dir: Path) -> None:
         self.base_dir = base_dir
         self.base_dir.mkdir(parents=True, exist_ok=True)
+        self._lock = threading.Lock()
 
     def _path(self, problem_id: str) -> Path:
         return self.base_dir / f"{problem_id}.json"
 
-    def list(self) -> builtin_list[Problem]:
-        problems: builtin_list[Problem] = []
+    def list_problems(self) -> list[Problem]:
+        problems: list[Problem] = []
         for path in sorted(self.base_dir.glob("*.json")):
             problems.append(Problem.model_validate(json.loads(path.read_text(encoding="utf-8"))))
         problems.sort(key=lambda p: p.created_at.isoformat(), reverse=True)
         return problems
 
-    def approved(self) -> builtin_list[Problem]:
-        return [p for p in self.list() if p.source == "approved"]
+    def approved(self) -> list[Problem]:
+        return [p for p in self.list_problems() if p.source == "approved"]
 
     def get(self, problem_id: str) -> Problem:
         path = self._path(problem_id)
@@ -67,22 +68,27 @@ class ProblemStore:
         source_run_id: str | None = None,
     ) -> Problem:
         """문제를 등록한다. 정규화 텍스트 해시로 중복이면 기존 문제를 반환한다."""
+        if not normalize_source(text):
+            raise ValueError("문제 텍스트가 비어 있다")
         text_hash = hashlib.sha256(normalize_source(text).encode("utf-8")).hexdigest()
-        existing = next((p for p in self.list() if p.text_hash == text_hash), None)
-        if existing is not None:
-            return existing
-        problem = Problem(
-            problem_id=f"problem-{uuid.uuid4().hex[:8]}",
-            title=title,
-            text=text,
-            source=source,
-            source_run_id=source_run_id,
-            text_hash=text_hash,
-        )
-        self._path(problem.problem_id).write_text(
-            json.dumps(problem.model_dump(mode="json"), ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
+        with self._lock:
+            existing = next(
+                (p for p in self.list_problems() if p.text_hash == text_hash), None
+            )
+            if existing is not None:
+                return existing
+            problem = Problem(
+                problem_id=f"problem-{uuid.uuid4().hex[:8]}",
+                title=title,
+                text=text,
+                source=source,
+                source_run_id=source_run_id,
+                text_hash=text_hash,
+            )
+            self._path(problem.problem_id).write_text(
+                json.dumps(problem.model_dump(mode="json"), ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
         return problem
 
     def delete(self, problem_id: str) -> None:
