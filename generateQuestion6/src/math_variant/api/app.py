@@ -135,14 +135,16 @@ class PipelineRunner:
             )
         except MathVariantError as exc:
             self.jobs.fail(job_id, exc.error.message, exc.code.value)
-            return
         except Exception as exc:  # 러너에서 어떤 실패도 job 에 남긴다
             self.jobs.fail(job_id, str(exc)[:500])
-            return
-        run_data = report_to_run_store(report)
-        self.store.save_run(report.run_id, run_data)
-        self.jobs.complete(job_id, {"run_id": report.run_id, "candidates": len(report.candidates)})
-        _clear_active(job_id)
+        else:
+            run_data = report_to_run_store(report)
+            self.store.save_run(report.run_id, run_data)
+            self.jobs.complete(
+                job_id, {"run_id": report.run_id, "candidates": len(report.candidates)}
+            )
+        finally:
+            _clear_active(job_id)
 
 
 def _try_acquire_active() -> bool:

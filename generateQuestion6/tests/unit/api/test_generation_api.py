@@ -123,3 +123,41 @@ def test_generation_missing_problem_404(client: TestClient) -> None:
         json={"source": {"mode": "problem", "problem_id": "problem-nope"}, "options": {}},
     )
     assert response.status_code == 404
+
+
+def test_failed_job_releases_active_lock(client: TestClient, monkeypatch) -> None:
+    import time
+
+    from math_variant import pipeline_factory as pipeline_factory_module
+    from math_variant.errors import ErrorCode, MathVariantError, StructuredError
+
+    def _boom(**_: object) -> object:
+        raise MathVariantError(
+            StructuredError(code=ErrorCode.AGENT_UNRESOLVED, message="고의 실패")
+        )
+
+    monkeypatch.setattr(pipeline_factory_module, "build_agent_pipeline", _boom)
+    monkeypatch.setattr(
+        api_module,
+        "_runner",
+        api_module.PipelineRunner(api_module._default_jobs(), api_module._default_store()),
+    )
+    api_module._reset_active_job()
+
+    created = client.post(
+        "/api/generations",
+        json={"source": {"mode": "text", "text": "첫번째"}, "options": {}},
+    ).json()
+    job_id = created["job_id"]
+    for _ in range(100):
+        if api_module._active_job_id is None:
+            break
+        time.sleep(0.05)
+    assert api_module._active_job_id is None
+    assert client.get(f"/api/generations/{job_id}").json()["status"] == "failed"
+
+    response = client.post(
+        "/api/generations",
+        json={"source": {"mode": "text", "text": "두번째"}, "options": {}},
+    )
+    assert response.status_code == 200
