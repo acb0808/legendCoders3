@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from math_variant.domain.candidate import Formalization, SolutionStepClaim
 from math_variant.domain.transformation import Dimension
 from math_variant.providers.registry import SchemaRegistry
+from math_variant.services.blind_solver import BlindSolution
 
 
 class ProductionStrategy(BaseModel):
@@ -141,3 +142,4 @@ def register_agent_schemas(registry: SchemaRegistry) -> None:
         VisionOutput,
     ):
         registry.register(model)
+    registry.register(BlindSolution)
