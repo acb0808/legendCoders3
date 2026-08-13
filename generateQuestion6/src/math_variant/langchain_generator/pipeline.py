@@ -21,6 +21,7 @@ from __future__ import annotations
 import json
 import logging
 import operator
+import os
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -55,7 +56,7 @@ from math_variant.agents.schemas import (
 )
 from math_variant.agents.selector import SelectorAgent
 from math_variant.agents.vision_artist import VisionArtist
-from math_variant.domain.candidate import CandidateProblem
+from math_variant.domain.candidate import CandidateProblem, SolutionStepClaim
 from math_variant.errors import ErrorCode, MathVariantError, StructuredError
 from math_variant.events import EventStage, PipelineEvent
 from math_variant.langchain_generator.chains import build_structured_chain
@@ -157,6 +158,7 @@ class PipelineContext:
     scope_section: str = ""
     critic_scope_section: str = ""
     reference_runnable: Runnable[dict[str, str], dict[str, Any]] | None = None
+    enable_style_align: bool = False
 
 
 class PipelineState(TypedDict, total=False):
@@ -544,7 +546,8 @@ def _critic_route(state: PipelineState, runtime: Runtime[PipelineContext]) -> st
     needs_figure = runtime.context.vision is not None and (
         state["generator_output"].needs_figure or state["blueprint"].figure_required
     )
-    return "vision" if needs_figure else "verdict"
+    target = "style_align" if runtime.context.enable_style_align else "verdict"
+    return "vision" if needs_figure else target
 
 
 def _vision_node(state: PipelineState, runtime: Runtime[PipelineContext]) -> dict[str, Any]:
@@ -565,7 +568,43 @@ def _vision_node(state: PipelineState, runtime: Runtime[PipelineContext]) -> dic
 
 
 def _vision_route(state: PipelineState, runtime: Runtime[PipelineContext]) -> str:
-    return "skip" if state.get("failed") else "verdict"
+    target = "style_align" if runtime.context.enable_style_align else "verdict"
+    return "skip" if state.get("failed") else target
+
+
+def _style_align_node(
+    state: PipelineState, runtime: Runtime[PipelineContext]
+) -> dict[str, Any]:
+    """해설 스타일 가이드(solveSkill grounding 패턴)에 따라 풀이 단계를 정렬한다 (M6)."""
+    style_guide = state.get("style_guide")
+    candidate = state.get("candidate")
+    if style_guide is None or candidate is None or not candidate.solution_steps:
+        return {}
+
+    aligned_steps: list[SolutionStepClaim] = []
+    vocab = style_guide.justification_vocab or ["따라서"]
+    primary_vocab = vocab[0] if vocab else "따라서"
+
+    for i, step in enumerate(candidate.solution_steps):
+        statement = step.statement
+        justification = step.justification
+
+        # 마지막 단계에 결론 어구 정렬
+        if i == len(candidate.solution_steps) - 1:
+            if not any(v in justification or v in statement for v in vocab):
+                justification = f"{primary_vocab} {justification}".strip()
+
+        aligned_steps.append(
+            SolutionStepClaim(
+                step_id=step.step_id,
+                statement=statement,
+                justification=justification,
+                claimed=step.claimed,
+            )
+        )
+
+    candidate.solution_steps = aligned_steps
+    return {"candidate": candidate}
 
 
 def _verdict_node(state: PipelineState, runtime: Runtime[PipelineContext]) -> dict[str, Any]:
@@ -712,6 +751,7 @@ def _build_graph() -> GraphT:
     graph.add_node("blind", _blind_node)
     graph.add_node("critic", _critic_node)
     graph.add_node("vision", _vision_node)
+    graph.add_node("style_align", _style_align_node)
     graph.add_node("verdict", _verdict_node)
     graph.add_node("emit_verdict", _emit_node)
     graph.add_node("skip", _skip_node)
@@ -745,9 +785,16 @@ def _build_graph() -> GraphT:
     graph.add_conditional_edges("sandbox", _sandbox_route, {"skip": "skip", "blind": "blind"})
     graph.add_conditional_edges("blind", _blind_route, {"skip": "skip", "critic": "critic"})
     graph.add_conditional_edges(
-        "critic", _critic_route, {"skip": "skip", "vision": "vision", "verdict": "verdict"}
+        "critic",
+        _critic_route,
+        {"skip": "skip", "vision": "vision", "verdict": "verdict", "style_align": "style_align"},
     )
-    graph.add_conditional_edges("vision", _vision_route, {"skip": "skip", "verdict": "verdict"})
+    graph.add_conditional_edges(
+        "vision",
+        _vision_route,
+        {"skip": "skip", "verdict": "verdict", "style_align": "style_align"},
+    )
+    graph.add_edge("style_align", "verdict")
     graph.add_conditional_edges(
         "verdict", _verdict_route, {"revise": "bump_attempts", "emit": "emit_verdict"}
     )
@@ -813,12 +860,18 @@ def build_pipeline_graph(
     scope_section: str = "",
     critic_scope_section: str = "",
     reference_runnable: Runnable[dict[str, str], dict[str, Any]] | None = None,
+    enable_style_align: bool | None = None,
 ) -> LangChainPipeline:
     """주입된 에이전트·검증기로 컴파일된 파이프라인을 만든다.
 
     테스트는 가짜 엔진 기반 에이전트를 주입해 네트워크 없이 전체 흐름을
     검증할 수 있다 (기존 tests/unit/agents/test_pipeline.py 와 동일한 패턴).
     """
+    style_align_flag = (
+        enable_style_align
+        if enable_style_align is not None
+        else os.getenv("MATH_VARIANT_STYLE_ALIGN", "0").strip() == "1"
+    )
     context = PipelineContext(
         planner=planner,
         ideator=ideator,
@@ -837,6 +890,7 @@ def build_pipeline_graph(
         scope_section=scope_section,
         critic_scope_section=critic_scope_section,
         reference_runnable=reference_runnable,
+        enable_style_align=style_align_flag,
     )
     return LangChainPipeline(_build_graph().compile(), context)
 
@@ -853,6 +907,7 @@ def build_langchain_pipeline(
     scope_section: str = "",
     critic_scope_section: str = "",
     reference_runnable: Runnable[dict[str, str], dict[str, Any]] | None = None,
+    enable_style_align: bool | None = None,
 ) -> LangChainPipeline:
     """설정·역할 체인·에이전트를 묶어 LangChain 파이프라인 그래프를 구성한다.
 
@@ -935,5 +990,6 @@ def build_langchain_pipeline(
         scope_section=scope_section,
         critic_scope_section=critic_scope_section,
         reference_runnable=reference_runnable,
+        enable_style_align=enable_style_align,
     )
     return graph
