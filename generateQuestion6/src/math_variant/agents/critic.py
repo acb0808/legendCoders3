@@ -23,6 +23,8 @@ class CriticAgent:
         candidate_id: str = "critic",
         source_text: str = "",
         forbidden_structure: list[str] | None = None,
+        *,
+        scope_section: str = "",
     ) -> CriticOutput:
         prompt = (
             f"{self.prompt_bundle}\n\n"
@@ -40,6 +42,8 @@ class CriticAgent:
                 "\n\n[원본 구성 골격 (동일 골격 재사용은 낮은 점수)]"
                 f"\n- {forbidden_structure}\n"
             )
+        if scope_section.strip():
+            prompt += f"\n\n{scope_section.strip()}"
         data = request_structured(
             self.engine,
             request_id=candidate_id,

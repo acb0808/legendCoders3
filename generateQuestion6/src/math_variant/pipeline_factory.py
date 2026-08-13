@@ -1,12 +1,15 @@
-"""파이프라인 팩토리 — CLI·웹(API)이 공용으로 사용하는 AgentPipeline 구성.
+"""파이프라인 팩토리 — CLI·웹(API)이 공용으로 사용하는 파이프라인 구성.
 
-실제 LLM 공급자 호출은 여기서 하지 않고 AgentPipeline.run() 시점에 발생한다.
+기본 httpx 파이프라인(AgentPipeline) 및 LangChain 파이프라인(LangChainPipeline)을
+동일한 인터페이스로 생성·교체할 수 있다.
 """
 
 from __future__ import annotations
 
+import os
 from collections.abc import Callable
 from pathlib import Path
+from typing import Literal, Protocol
 
 from math_variant.agents.blind import LLMBlindSolver
 from math_variant.agents.code_reviewer import CodeReviewAgent
@@ -14,7 +17,7 @@ from math_variant.agents.critic import CriticAgent
 from math_variant.agents.generator import GeneratorAgent
 from math_variant.agents.ideator import IdeatorAgent
 from math_variant.agents.judge import JudgeAgent
-from math_variant.agents.pipeline import AgentPipeline
+from math_variant.agents.pipeline import AgentPipeline, PipelineReport
 from math_variant.agents.planner import PlannerAgent
 from math_variant.agents.schemas import register_agent_schemas
 from math_variant.agents.selector import SelectorAgent
@@ -25,10 +28,51 @@ from math_variant.providers.registry import SchemaRegistry
 from math_variant.providers.resolver import RoleResolver
 from math_variant.providers.settings import ProviderSettings
 from math_variant.providers.structured import StructuredOutputEngine
+from math_variant.reference.curriculum import build_scope
+from math_variant.reference.sections import (
+    critic_scope_section as render_critic_scope,
+)
+from math_variant.reference.sections import (
+    planner_scope_section as render_planner_scope,
+)
 from math_variant.sandbox.provider import DockerSandboxProvider
 from math_variant.services.blind_solver import BlindSolver
 
 PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
+
+
+class PipelineRunnerProtocol(Protocol):
+    """파이프라인 실행자 프로토콜 (AgentPipeline 과 LangChainPipeline 공통)."""
+
+    def run(
+        self, source_text: str, strategy_brief: str = "", difficulty_target: str = ""
+    ) -> PipelineReport: ...
+
+
+def _resolve_scope_sections(
+    scope_profile: str | None = None,
+    scope_section: str | None = None,
+    critic_scope_section: str | None = None,
+) -> tuple[str, str]:
+    if scope_section is not None and critic_scope_section is not None:
+        return scope_section, critic_scope_section
+
+    profile = (
+        scope_profile
+        if scope_profile is not None
+        else os.getenv("MATH_VARIANT_SCOPE", "geometry").strip().lower()
+    )
+    if profile == "off":
+        return "", ""
+
+    include_sets = profile in ("with_sets", "full")
+    include_functions = profile == "full"
+    scope = build_scope(include_sets=include_sets, include_functions=include_functions)
+    resolved_scope = scope_section if scope_section is not None else render_planner_scope(scope)
+    resolved_critic = (
+        critic_scope_section if critic_scope_section is not None else render_critic_scope(scope)
+    )
+    return resolved_scope, resolved_critic
 
 
 def build_agent_pipeline(
@@ -40,25 +84,29 @@ def build_agent_pipeline(
     figures_dir: Path,
     sandbox_image: str = "math-variant-sandbox:test",
     forbidden_context: dict[str, str] | None = None,
+    scope_profile: str | None = None,
+    scope_section: str | None = None,
+    critic_scope_section: str | None = None,
 ) -> AgentPipeline:
-    """설정·공급자·에이전트를 묶어 AgentPipeline 을 구성한다.
-
-    NOTE: `runs_dir` 은 반드시 JOB 단위 고유 디렉터리여야 한다.
-    AgentPipeline._write_report 가 `runs_dir/report.json` 에 무조건 쓰므로,
-    웹 레이어가 여러 job 을 동시에 실행하면 서로 report.json 을 덮어쓴다.
-    CLI 단발 실행은 `Path("runs")` 로 충분하지만, 웹 워커는 실행마다
-    per-run 디렉터리를 만들어 넘겨야 한다 (실제 per-job 배선은 Task 8).
-    """
+    """기본 httpx 공급자·에이전트를 묶어 AgentPipeline 을 구성한다."""
     settings = ProviderSettings()
     registry = build_provider_registry(settings)
     schemas = SchemaRegistry()
     register_agent_schemas(schemas)
     resolver = RoleResolver(settings.role_policy(), registry)
-    engine = StructuredOutputEngine(primary=None, fallback=None, schemas=schemas, on_event=on_event)
+    engine = StructuredOutputEngine(
+        primary=None, fallback=None, schemas=schemas, on_event=on_event
+    )
     engine.role_resolver = resolver
 
     def _prompt(name: str) -> str:
         return (PROMPTS_DIR / name).read_text(encoding="utf-8")
+
+    sec_planner, sec_critic = _resolve_scope_sections(
+        scope_profile=scope_profile,
+        scope_section=scope_section,
+        critic_scope_section=critic_scope_section,
+    )
 
     return AgentPipeline(
         planner=PlannerAgent(engine, _prompt("planner.md")),
@@ -79,4 +127,57 @@ def build_agent_pipeline(
         ideator_count=ideator_count,
         max_refine=max_refine,
         on_event=on_event,
+        scope_section=sec_planner,
+        critic_scope_section=sec_critic,
+    )
+
+
+def build_pipeline(
+    *,
+    engine: Literal["default", "langchain"] | None = None,
+    ideator_count: int = 3,
+    max_refine: int = 2,
+    on_event: Callable[[PipelineEvent], None] | None = None,
+    runs_dir: Path,
+    figures_dir: Path,
+    sandbox_image: str = "math-variant-sandbox:test",
+    forbidden_context: dict[str, str] | None = None,
+    scope_profile: str | None = None,
+    scope_section: str | None = None,
+    critic_scope_section: str | None = None,
+) -> PipelineRunnerProtocol:
+    """엔진 설정(또는 MATH_VARIANT_PIPELINE_ENGINE 환경변수)에 따라 파이프라인을 생성한다."""
+    chosen_engine = engine or os.getenv("MATH_VARIANT_PIPELINE_ENGINE", "default").lower()
+    if chosen_engine == "langchain":
+        from math_variant.langchain_generator.pipeline import build_langchain_pipeline
+
+        sec_planner, sec_critic = _resolve_scope_sections(
+            scope_profile=scope_profile,
+            scope_section=scope_section,
+            critic_scope_section=critic_scope_section,
+        )
+
+        return build_langchain_pipeline(
+            ideator_count=ideator_count,
+            max_refine=max_refine,
+            on_event=on_event,
+            runs_dir=runs_dir,
+            figures_dir=figures_dir,
+            sandbox_image=sandbox_image,
+            forbidden_context=forbidden_context,
+            scope_section=sec_planner,
+            critic_scope_section=sec_critic,
+        )
+
+    return build_agent_pipeline(
+        ideator_count=ideator_count,
+        max_refine=max_refine,
+        on_event=on_event,
+        runs_dir=runs_dir,
+        figures_dir=figures_dir,
+        sandbox_image=sandbox_image,
+        forbidden_context=forbidden_context,
+        scope_profile=scope_profile,
+        scope_section=scope_section,
+        critic_scope_section=critic_scope_section,
     )

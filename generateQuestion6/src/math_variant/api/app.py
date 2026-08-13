@@ -140,7 +140,7 @@ class PipelineRunner:
 
     def _execute(self, job_id: str, source_text: str, options: dict[str, Any]) -> None:
         from math_variant.errors import MathVariantError
-        from math_variant.pipeline_factory import build_agent_pipeline
+        from math_variant.pipeline_factory import build_pipeline
         from math_variant.services.normalize import normalize_source
 
         def _on_event(event: PipelineEvent) -> None:
@@ -152,7 +152,7 @@ class PipelineRunner:
 
         try:
             self.jobs.set_status(job_id, "running")
-            pipeline = build_agent_pipeline(
+            pipeline = build_pipeline(
                 ideator_count=int(options.get("ideator_count", 3)),
                 max_refine=int(options.get("max_refine", 2)),
                 on_event=_on_event,

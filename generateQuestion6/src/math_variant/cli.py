@@ -271,10 +271,10 @@ def run_pipeline(argv: list[str] | None = None) -> int:
         return 1
 
     from math_variant.errors import MathVariantError
-    from math_variant.pipeline_factory import build_agent_pipeline
+    from math_variant.pipeline_factory import build_pipeline
     from math_variant.services.normalize import normalize_source
 
-    pipeline = build_agent_pipeline(
+    pipeline = build_pipeline(
         ideator_count=3,
         max_refine=2,
         on_event=None,

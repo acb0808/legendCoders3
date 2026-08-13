@@ -118,6 +118,8 @@ class AgentPipeline:
         max_workers: int = 4,
         max_refine: int = 2,
         on_event: Callable[[PipelineEvent], None] | None = None,
+        scope_section: str = "",
+        critic_scope_section: str = "",
     ) -> None:
         self.planner = planner
         self.ideator = ideator
@@ -136,6 +138,8 @@ class AgentPipeline:
         self.blind_calls = 0
         self.on_event = on_event
         self._event_seq = 0
+        self.scope_section = scope_section
+        self.critic_scope_section = critic_scope_section
         self.logger = logging.getLogger("math_variant.agents.pipeline")
 
     def _emit(
@@ -178,7 +182,11 @@ class AgentPipeline:
     ) -> PipelineReport:
         run_id = f"run-{uuid.uuid4().hex[:8]}"
         self._emit(EventStage.PLANNER, "started", "원문을 분석하여 변형 전략을 수립한다")
-        planner_out = self.planner.plan(source_text, difficulty_target=difficulty_target)
+        planner_out = self.planner.plan(
+            source_text,
+            difficulty_target=difficulty_target,
+            scope_section=self.scope_section,
+        )
         self._emit(EventStage.PLANNER, "done", "변형 스펙·전략 수립 완료")
         strategy = _to_strategy_dict(planner_out.strategy)
         if not strategy_brief:
@@ -417,6 +425,7 @@ class AgentPipeline:
             candidate_id=candidate_id,
             source_text=source_text,
             forbidden_structure=forbidden_structure,
+            scope_section=self.critic_scope_section,
         )
         self._emit(EventStage.CRITIC, "done", f"점수: {critic.score}", candidate_id)
 

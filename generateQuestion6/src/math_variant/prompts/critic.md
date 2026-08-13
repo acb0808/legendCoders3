@@ -18,6 +18,7 @@
 - 원본 문항은 참신성 비교에만 사용한다. 후보·산출물에 원문을 포함하지 않는다.
 - 명확성: 조건·목표가 모호하지 않은가.
 - 교육 타당성: 범위 내 개념만 사용하고 추측 요소가 없는가.
+- 교육과정 정합: 문제나 해설에 허용 범위를 벗어난 개념(금지 개념)이 포함되어 있으면 comments에 `CURRICULUM_VIOLATION`을 기록하고 recommendation='REVISE'로 판정한다.
 
 ## 출력 스키마
 - score(0~10), difficulty_estimate, criteria_scores{novelty, clarity, pedagogy,

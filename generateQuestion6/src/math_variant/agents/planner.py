@@ -18,8 +18,17 @@ class PlannerAgent:
         self.engine = engine
         self.prompt_bundle = prompt_bundle
 
-    def plan(self, source_text: str, difficulty_target: str = "") -> PlannerOutput:
-        prompt = f"{self.prompt_bundle}\n\n[원문]\n{source_text}"
+    def plan(
+        self,
+        source_text: str,
+        difficulty_target: str = "",
+        *,
+        scope_section: str = "",
+    ) -> PlannerOutput:
+        prompt = f"{self.prompt_bundle}\n\n"
+        if scope_section.strip():
+            prompt += f"{scope_section.strip()}\n\n"
+        prompt += f"[원문]\n{source_text}"
         if difficulty_target.strip():
             prompt += f"\n[난이도 목표]\n{difficulty_target}"
         data = request_structured(
