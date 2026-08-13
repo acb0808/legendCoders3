@@ -18,7 +18,7 @@ class DeepSeekProvider(OpenAICompatibleProvider):
         api_key: str,
         base_url: str = "https://api.deepseek.com/v1",
         client: httpx.Client | None = None,
-        timeout_seconds: float = 120.0,
+        timeout_seconds: float = 600.0,
     ) -> None:
         super().__init__(
             name="deepseek",

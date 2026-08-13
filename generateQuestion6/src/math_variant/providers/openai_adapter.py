@@ -27,7 +27,7 @@ class OpenAICompatibleProvider:
         api_key: str,
         base_url: str,
         client: httpx.Client | None = None,
-        timeout_seconds: float = 120.0,
+        timeout_seconds: float = 600.0,
     ) -> None:
         self.name = name
         self._api_key = api_key
@@ -64,10 +64,9 @@ class OpenAICompatibleProvider:
         # temperature 는 의도적으로 보내지 않는다:
         # - deepseek-v4-flash 는 temperature 를 보내면 빈 응답이 잦다 (실측 temp 제거 시 0/4)
         # - gpt-5.6-luna 는 temperature 를 지원하지 않는다 (기본값 1 만 허용)
-        # 공급자별 토큰 상한 파라미터명: luna(openai 계열)는 max_completion_tokens,
-        # deepseek 는 max_tokens 를 쓴다.
-        token_key = "max_tokens" if self.name == "deepseek" else "max_completion_tokens"
-        body[token_key] = policy.max_tokens
+        # 출력 길이 제한(max_tokens/max_completion_tokens)은 보내지 않는다:
+        # - 고정 상한은 긴 reasoning 이 먼저 출력될 때 최종 content 를 잘라 빈 응답을 만든다.
+        # - 공급자 기본 상한에 맡긴다. (사용자 요청)
         headers = {
             "Authorization": f"Bearer {self._api_key}",
             "Content-Type": "application/json",

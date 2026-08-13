@@ -117,34 +117,29 @@ def test_temperature_omitted_for_flaky_flash() -> None:
     assert "temperature" not in transport.request_body
 
 
-def test_max_tokens_param_by_provider() -> None:
-    """luna 는 max_completion_tokens, deepseek 는 max_tokens 를 사용한다."""
-    from math_variant.providers.secondary_adapter import DeepSeekProvider
+def test_output_length_limit_omitted() -> None:
+    """출력 길이 제한(max_tokens/max_completion_tokens)을 요청에 담지 않는다.
 
-    # deepseek
-    transport_ds = _RecordingTransport()
-    ds = DeepSeekProvider(
-        api_key="test-key",
-        base_url="https://api.deepseek.com/v1",
-        client=httpx.Client(transport=transport_ds),
-    )
-    ds.complete("문제", ModelPolicy(provider="deepseek", model="deepseek-v4-flash"))
-    assert transport_ds.request_body is not None
-    assert "max_tokens" in transport_ds.request_body
-    assert "max_completion_tokens" not in transport_ds.request_body
-
-    # luna (openai 계열)
-    transport_luna = _RecordingTransport()
-    luna = OpenAICompatibleProvider(
-        name="openai",
-        api_key="test-key",
-        base_url="https://api.openai.com/v1",
-        client=httpx.Client(transport=transport_luna),
-    )
-    luna.complete("문제", ModelPolicy(provider="openai", model="gpt-5.6-luna"))
-    assert transport_luna.request_body is not None
-    assert "max_completion_tokens" in transport_luna.request_body
-    assert "max_tokens" not in transport_luna.request_body
+    고정 상한은 긴 reasoning 이 먼저 출력될 때 최종 content 를 잘라 빈 응답을 만든다.
+    공급자 기본 상한에 맡긴다. (사용자 요청)
+    """
+    for provider_name, transport in (
+        ("deepseek", _RecordingTransport()),
+        ("openai", _RecordingTransport()),
+    ):
+        provider = OpenAICompatibleProvider(
+            name=provider_name,
+            api_key="test-key",
+            base_url="https://api.example.com/v1",
+            client=httpx.Client(transport=transport),
+        )
+        provider.complete(
+            "문제",
+            ModelPolicy(provider=provider_name, model="m"),
+        )
+        assert transport.request_body is not None
+        assert "max_tokens" not in transport.request_body
+        assert "max_completion_tokens" not in transport.request_body
 
 
 def test_streaming_sends_stream_and_delivers_deltas() -> None:

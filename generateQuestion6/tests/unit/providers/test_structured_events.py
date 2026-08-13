@@ -236,6 +236,5 @@ class _FakeResolver:
             {
                 "provider": "fake",
                 "model": "fake-model",
-                "max_tokens": 100,
             },
         )()

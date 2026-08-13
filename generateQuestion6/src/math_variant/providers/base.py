@@ -25,7 +25,6 @@ class ModelPolicy(BaseModel):
 
     provider: str
     model: str
-    max_tokens: int = Field(default=4096, ge=1)
 
 
 class RawCompletion(BaseModel):

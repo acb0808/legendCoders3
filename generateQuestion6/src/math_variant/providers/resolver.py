@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 from math_variant.errors import ErrorCode, MathVariantError, StructuredError
 from math_variant.providers.base import LLMProvider, ModelPolicy
@@ -20,7 +20,6 @@ class RolePolicyEntry(BaseModel):
 
     provider: str
     model: str
-    max_tokens: int = Field(default=4096, ge=1)
     fallback_provider: str | None = None
     fallback_model: str | None = None
 
@@ -57,7 +56,6 @@ class RoleResolver:
         return ModelPolicy(
             provider=entry.provider,
             model=entry.model,
-            max_tokens=entry.max_tokens,
         )
 
     def provider_for(self, role: RolePolicy) -> LLMProvider:
