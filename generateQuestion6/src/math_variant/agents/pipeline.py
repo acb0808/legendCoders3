@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import uuid
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
@@ -40,6 +41,7 @@ from math_variant.agents.schemas import (
 from math_variant.agents.selector import SelectorAgent
 from math_variant.agents.vision_artist import VisionArtist
 from math_variant.domain.candidate import CandidateProblem
+from math_variant.errors import ErrorCode, MathVariantError, StructuredError
 from math_variant.events import EventStage, PipelineEvent
 from math_variant.sandbox.provider import SandboxProvider
 from math_variant.services.blind_solver import BlindConsensus
@@ -133,6 +135,7 @@ class AgentPipeline:
         self.blind_calls = 0
         self.on_event = on_event
         self._event_seq = 0
+        self.logger = logging.getLogger("math_variant.agents.pipeline")
 
     def _emit(
         self,
@@ -189,11 +192,25 @@ class AgentPipeline:
             strategy=planner_out.strategy,
         )
         self._emit(EventStage.IDEATION, "started", f"변형 아이디어 {self.ideator_count}개 발상")
+        # 발상은 선택적이다 — 병렬 호출 중 일부만 성공해도 성공한 아이디어로 진행한다.
+        # 하나의 발상 실패로 전체 파이프라인이 죽지 않도록 개별 예외를 삼킨다.
+        ideas: list[IdeationOutput] = []
         with ThreadPoolExecutor(max_workers=self.max_workers) as pool:
-            ideas = list(
-                pool.map(
-                    lambda seed: self.ideator.ideate(ideation_brief, seed=str(seed)),
-                    range(self.ideator_count),
+            futures = {
+                pool.submit(self.ideator.ideate, ideation_brief, seed=str(seed)): seed
+                for seed in range(self.ideator_count)
+            }
+            for future in futures:
+                try:
+                    ideas.append(future.result())
+                except Exception as exc:
+                    self.logger.warning("ideator_skipped", extra={"error": str(exc)[:300]})
+        if not ideas:
+            raise MathVariantError(
+                StructuredError(
+                    code=ErrorCode.AGENT_UNRESOLVED,
+                    message="모든 발상자(ideator)가 아이디어를 생성하지 못했다",
+                    context={"ideator_count": self.ideator_count},
                 )
             )
         self._emit(EventStage.IDEATION, "done", f"발상 완료 ({len(ideas)}개)")

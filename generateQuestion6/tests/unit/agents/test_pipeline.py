@@ -293,6 +293,50 @@ def test_pipeline_forwards_difficulty_target_to_planner(tmp_path) -> None:
     assert "상" in planner_prompt
 
 
+def test_pipeline_continues_when_one_ideator_fails(tmp_path) -> None:
+    """병렬 발상 중 일부만 성공해도 진행한다 (발상은 선택적)."""
+    engine = _Engine(
+        {
+            "planner": [_PLANNER],
+            # ideator 큐에 1개만 두면 ideator_count=2 중 하나는 ok=False 로 실패한다
+            "ideator": [_IDEAS[0]],
+            "selector": [{"adopted_ideas": ["idea-1"], "rationale": "부합"}],
+            "generator": [_CANDIDATE],
+            "code_reviewer": [_REVIEW_OK],
+            "critic": [_CRITIC],
+            "judge": [_JUDGE],
+        }
+    )
+    report = _pipeline(engine, tmp_path).run("원문")
+    assert len(report.ideas) == 1
+    assert report.ideas[0].idea_id == "idea-1"
+    assert report.candidates
+    assert report.candidates[0].status == "PASS"
+
+
+def test_pipeline_fails_when_all_ideators_fail(tmp_path) -> None:
+    """발상이 전부 실패하면 AGENT_UNRESOLVED 로 실패한다."""
+    from math_variant.errors import MathVariantError
+
+    engine = _Engine(
+        {
+            "planner": [_PLANNER],
+            "ideator": [],  # 전부 실패
+            "selector": [],
+            "generator": [],
+            "code_reviewer": [],
+            "critic": [],
+            "judge": [],
+        }
+    )
+    try:
+        _pipeline(engine, tmp_path).run("원문")
+    except MathVariantError as exc:
+        assert exc.code == "AGENT_UNRESOLVED"
+    else:
+        raise AssertionError("발상 전부 실패 시 예외가 발생해야 한다")
+
+
 def test_llm_blind_solver_uses_blind_role_and_returns_solution() -> None:
     engine = _Engine(
         {
