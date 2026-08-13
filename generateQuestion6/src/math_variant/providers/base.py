@@ -7,11 +7,15 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Protocol, runtime_checkable
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from math_variant.providers.contracts import RolePolicy
+
+# 토큰 델타 콜백: (content_delta, reasoning_delta). 둘 다 비어 있을 수 있다.
+StreamDeltaCallback = Callable[[str, str], None]
 
 
 class ModelPolicy(BaseModel):
@@ -45,7 +49,12 @@ class LLMProvider(Protocol):
 
     name: str
 
-    def complete(self, prompt: str, policy: ModelPolicy) -> RawCompletion: ...
+    def complete(
+        self,
+        prompt: str,
+        policy: ModelPolicy,
+        on_delta: StreamDeltaCallback | None = None,
+    ) -> RawCompletion: ...
 
 
 RolePrompt = str

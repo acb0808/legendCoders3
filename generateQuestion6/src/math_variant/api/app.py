@@ -30,6 +30,7 @@ from math_variant.api.storage import (
     RunNotFoundError,
     RunStore,
 )
+from math_variant.events import PipelineEvent
 
 
 def _recover_stale_jobs() -> None:
@@ -84,6 +85,11 @@ _runner: Runner | None = None
 _active_job_id: str | None = None
 _active_job_lock = threading.Lock()
 
+# LLM 토큰 델타 버퍼: llm_delta 이벤트는 영속화하지 않고 메모리에만 둔다.
+# (토큰 단위라 많고, 완료된 llm_call 이벤트가 요약을 남기므로 디스크에 남길 필요가 없다)
+_delta_buffers: dict[str, list[PipelineEvent]] = {}
+_delta_lock = threading.Lock()
+
 
 def _default_jobs() -> JobStore:
     global _jobs
@@ -137,12 +143,19 @@ class PipelineRunner:
         from math_variant.pipeline_factory import build_agent_pipeline
         from math_variant.services.normalize import normalize_source
 
+        def _on_event(event: PipelineEvent) -> None:
+            if event.type == "llm_delta":
+                with _delta_lock:
+                    _delta_buffers.setdefault(job_id, []).append(event)
+                return
+            self.jobs.append_event(job_id, event)
+
         try:
             self.jobs.set_status(job_id, "running")
             pipeline = build_agent_pipeline(
                 ideator_count=int(options.get("ideator_count", 3)),
                 max_refine=int(options.get("max_refine", 2)),
-                on_event=lambda event: self.jobs.append_event(job_id, event),
+                on_event=_on_event,
                 runs_dir=Path("runs") / "artifacts" / job_id,
                 figures_dir=Path("runs") / "artifacts" / job_id / "figures",
                 sandbox_image=self.sandbox_image,
@@ -164,6 +177,8 @@ class PipelineRunner:
             self.jobs.complete(job_id, {"run_id": job_id, "candidates": len(report.candidates)})
         finally:
             _clear_active(job_id)
+            with _delta_lock:
+                _delta_buffers.pop(job_id, None)
 
 
 def _try_acquire_active() -> bool:
@@ -334,6 +349,7 @@ def stream_generation_events(job_id: str) -> StreamingResponse:
 
     async def event_source() -> AsyncIterator[str]:
         last_index = 0
+        delta_index = 0
         while True:
             current = _default_jobs().load(job_id)
             events = current.events
@@ -341,6 +357,13 @@ def stream_generation_events(job_id: str) -> StreamingResponse:
                 event = events[last_index]
                 yield f"data: {event.model_dump_json()}\n\n"
                 last_index += 1
+            # 영속 이벤트 이후에 도착한 스트리밍 델타를 순서대로 이어서 전송한다.
+            with _delta_lock:
+                deltas = list(_delta_buffers.get(job_id, ()))
+            while delta_index < len(deltas):
+                event = deltas[delta_index]
+                yield f"data: {event.model_dump_json()}\n\n"
+                delta_index += 1
             if current.status in {"completed", "failed"}:
                 yield f"event: done\ndata: {current.status}\n\n"
                 break

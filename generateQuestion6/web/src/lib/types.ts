@@ -104,9 +104,9 @@ export const REJECT_REASON_CODES = [
 
 export type JobStatus = "queued" | "running" | "completed" | "failed";
 
-export type JobEventType = "stage" | "llm_call";
+export type JobEventType = "stage" | "llm_call" | "llm_delta";
 
-export type JobEventStatus = "started" | "done" | "failed";
+export type JobEventStatus = "started" | "done" | "failed" | "streaming";
 
 export interface JobEvent {
   event_id: string;

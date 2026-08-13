@@ -70,9 +70,9 @@ class PipelineEvent(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     event_id: str
-    type: Literal["stage", "llm_call"]
+    type: Literal["stage", "llm_call", "llm_delta"]
     stage: EventStage
-    status: Literal["started", "done", "failed"] = "done"
+    status: Literal["started", "done", "failed", "streaming"] = "done"
     message: str = ""
     candidate_id: str | None = None
     ts: datetime = Field(default_factory=lambda: datetime.now(UTC))

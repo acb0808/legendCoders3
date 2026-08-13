@@ -35,6 +35,29 @@ class _RecordingTransport(httpx.BaseTransport):
         return httpx.Response(200, json=payload, request=request)
 
 
+class _StreamingTransport(httpx.BaseTransport):
+    """SSE 스트리밍 응답을 반환하는 테스트용 전송 계층."""
+
+    def __init__(self) -> None:
+        self.request_body: dict | None = None
+
+    def handle_request(self, request: httpx.Request) -> httpx.Response:
+        self.request_body = json.loads(request.content.decode("utf-8"))
+        sse = (
+            'data: {"choices":[{"delta":{"role":"assistant","reasoning_content":"Think"}}]}\n\n'
+            'data: {"choices":[{"delta":{"content":"{\\"a\\": "}}]}\n\n'
+            'data: {"choices":[{"delta":{"content":"1}"}}]}\n\n'
+            'data: {"usage":{"total_tokens": 5}}\n\n'
+            "data: [DONE]\n\n"
+        )
+        return httpx.Response(
+            200,
+            content=sse.encode("utf-8"),
+            request=request,
+            headers={"Content-Type": "text/event-stream"},
+        )
+
+
 def _provider(transport: _RecordingTransport) -> OpenAICompatibleProvider:
     return OpenAICompatibleProvider(
         name="deepseek",
@@ -122,3 +145,55 @@ def test_max_tokens_param_by_provider() -> None:
     assert transport_luna.request_body is not None
     assert "max_completion_tokens" in transport_luna.request_body
     assert "max_tokens" not in transport_luna.request_body
+
+
+def test_streaming_sends_stream_and_delivers_deltas() -> None:
+    """on_delta 가 주어지면 stream=true 로 요청하고 토큰 조각을 콜백으로 전달한다."""
+    transport = _StreamingTransport()
+    provider = OpenAICompatibleProvider(
+        name="deepseek",
+        api_key="test-key",
+        base_url="https://api.deepseek.com/v1",
+        client=httpx.Client(transport=transport),
+    )
+
+    deltas: list[tuple[str, str]] = []
+
+    def on_delta(content_delta: str, reasoning_delta: str) -> None:
+        deltas.append((content_delta, reasoning_delta))
+
+    result = provider.complete(
+        "문제를 생성해라.",
+        ModelPolicy(provider="deepseek", model="deepseek-v4-flash"),
+        on_delta=on_delta,
+    )
+
+    assert transport.request_body is not None
+    assert transport.request_body["stream"] is True
+    assert transport.request_body["stream_options"] == {"include_usage": True}
+    # reasoning 조각과 content 조각이 순서대로 콜백에 전달된다
+    assert ("", "Think") in deltas
+    assert ('{"a": ', "") in deltas
+    assert ("1}", "") in deltas
+    # 최종 content 는 누적되어 반환된다
+    assert result.raw_text == '{"a": 1}'
+    # usage 청크에서 비용이 계산된다
+    assert result.cost_usd == 5 / 1_000_000
+
+
+def test_streaming_omits_temperature_like_non_streaming() -> None:
+    """스트리밍 요청도 temperature 를 보내지 않는다."""
+    transport = _StreamingTransport()
+    provider = OpenAICompatibleProvider(
+        name="deepseek",
+        api_key="test-key",
+        base_url="https://api.deepseek.com/v1",
+        client=httpx.Client(transport=transport),
+    )
+    provider.complete(
+        "문제",
+        ModelPolicy(provider="deepseek", model="deepseek-v4-flash"),
+        on_delta=lambda c, r: None,
+    )
+    assert transport.request_body is not None
+    assert "temperature" not in transport.request_body

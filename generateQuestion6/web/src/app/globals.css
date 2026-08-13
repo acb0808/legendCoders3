@@ -1335,6 +1335,107 @@ a {
   color: var(--ink-faint);
 }
 
+.call-log-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* 실시간 스트리밍 응답 패널 */
+.call-log-streams {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.call-log-streams h3 {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--ink-faint);
+}
+
+.call-stream-row {
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--amber);
+  border-radius: 8px;
+  padding: 10px 14px;
+  background: var(--paper-light);
+  font-size: 0.88rem;
+}
+
+.call-stream-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.call-stream-role {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.call-stream-cursor {
+  width: 7px;
+  height: 14px;
+  background: var(--amber);
+  animation: stream-blink 0.9s steps(2) infinite;
+}
+
+@keyframes stream-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+.call-stream-reasoning {
+  font-size: 0.86rem;
+}
+
+.call-stream-reasoning summary {
+  cursor: pointer;
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+
+.call-stream-reasoning pre {
+  margin: 6px 0 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  max-height: 240px;
+  overflow-y: auto;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+.call-stream-content {
+  margin: 6px 0 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
 /* ---------------- 문제 라이브러리 ---------------- */
 
 .problem-library {

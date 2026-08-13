@@ -123,7 +123,15 @@ class StructuredOutputEngine:
                 },
             )
             try:
-                completion = provider.complete(prompt, resolved_policy)
+                try:
+                    completion = provider.complete(
+                        prompt,
+                        resolved_policy,
+                        on_delta=self._stream_callback(request, attempts),
+                    )
+                except TypeError:
+                    # on_delta 를 지원하지 않는 공급자는 비스트리밍으로 폴백한다.
+                    completion = provider.complete(prompt, resolved_policy)
             except Exception as exc:
                 last_error = ProviderError(
                     code=ProviderErrorCode.INFRA_ERROR,
@@ -242,6 +250,45 @@ class StructuredOutputEngine:
             latency_ms=latency,
             cost_usd=cost,
         )
+
+    def _stream_callback(
+        self, request: StructuredRequest, attempt: int
+    ) -> Callable[[str, str], None]:
+        """LLM 호출 중 토큰 조각을 llm_delta 이벤트로 방출하는 콜백을 만든다."""
+
+        def _on_delta(content_delta: str, reasoning_delta: str) -> None:
+            if not content_delta and not reasoning_delta:
+                return
+            self._emit_llm_delta(request, attempt, content_delta, reasoning_delta)
+
+        return _on_delta
+
+    def _emit_llm_delta(
+        self,
+        request: StructuredRequest,
+        attempt: int,
+        content_delta: str,
+        reasoning_delta: str,
+    ) -> None:
+        if self.on_event is None:
+            return
+        with self._event_lock:
+            self._event_seq += 1
+            seq = self._event_seq
+        event = PipelineEvent(
+            event_id=f"llm-delta-{seq}",
+            type="llm_delta",
+            stage=ROLE_TO_STAGE.get(request.role.value, EventStage.DONE),
+            status="streaming",
+            ts=datetime.now(UTC),
+            data={
+                "role": request.role.value,
+                "attempt": attempt,
+                "content": content_delta,
+                "reasoning": reasoning_delta,
+            },
+        )
+        self.on_event(event)
 
     def _emit_llm_call(
         self,

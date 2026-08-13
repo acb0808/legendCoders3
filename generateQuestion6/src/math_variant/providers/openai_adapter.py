@@ -2,13 +2,20 @@
 
 httpx 를 통해 chat/completions 를 호출하고, 구조화 출력(response_format json_object)을
 요청한다. 비밀 키는 이 계층에서만 사용되고 로그에 남기지 않는다.
+
+스트리밍(T09): on_delta 콜백이 주어지면 stream=true 로 요청해 토큰 조각을
+(content, reasoning_content) 쌍으로 실시간 전달한다. deepseek-v4-flash 는
+reasoning_content(추론 과정)를 먼저 내보낸 뒤 최종 content 를 스트리밍한다.
 """
 
 from __future__ import annotations
 
+import json
+from typing import Any
+
 import httpx
 
-from math_variant.providers.base import ModelPolicy, RawCompletion
+from math_variant.providers.base import ModelPolicy, RawCompletion, StreamDeltaCallback
 
 
 class OpenAICompatibleProvider:
@@ -33,7 +40,12 @@ class OpenAICompatibleProvider:
             self._client = httpx.Client(timeout=self._timeout)
         return self._client
 
-    def complete(self, prompt: str, policy: ModelPolicy) -> RawCompletion:
+    def complete(
+        self,
+        prompt: str,
+        policy: ModelPolicy,
+        on_delta: StreamDeltaCallback | None = None,
+    ) -> RawCompletion:
         client = self._ensure_client()
         # DeepSeek 는 response_format=json_object 사용 시 프롬프트에 "json" 단어가
         # 반드시 있어야 400 을 반환하지 않는다. 어떤 프롬프트가 와도 만족하도록
@@ -60,17 +72,57 @@ class OpenAICompatibleProvider:
             "Authorization": f"Bearer {self._api_key}",
             "Content-Type": "application/json",
         }
-        response = client.post(
+        if on_delta is None:
+            response = client.post(
+                f"{self._base_url}/chat/completions",
+                headers=headers,
+                json=body,
+            )
+            response.raise_for_status()
+            payload = response.json()
+            content = payload["choices"][0]["message"]["content"]
+            return RawCompletion(
+                raw_text=content,
+                provider=self.name,
+                model=policy.model,
+                cost_usd=float(payload.get("usage", {}).get("total_tokens", 0)) / 1_000_000,
+            )
+
+        # 스트리밍 경로: SSE 로 토큰 조각을 받으며 누적한다.
+        body["stream"] = True
+        body["stream_options"] = {"include_usage": True}
+        content_parts: list[str] = []
+        cost_usd = 0.0
+        with client.stream(
+            "POST",
             f"{self._base_url}/chat/completions",
             headers=headers,
             json=body,
-        )
-        response.raise_for_status()
-        payload = response.json()
-        content = payload["choices"][0]["message"]["content"]
+        ) as response:
+            response.raise_for_status()
+            for line in response.iter_lines():
+                if not line or not line.startswith("data: "):
+                    continue
+                data = line[6:]
+                if data.strip() == "[DONE]":
+                    break
+                chunk: dict[str, Any] = json.loads(data)
+                usage = chunk.get("usage")
+                if usage:
+                    cost_usd = float(usage.get("total_tokens", 0)) / 1_000_000
+                choices = chunk.get("choices") or []
+                if not choices:
+                    continue
+                delta = choices[0].get("delta") or {}
+                content_delta = delta.get("content") or ""
+                reasoning_delta = delta.get("reasoning_content") or ""
+                if content_delta:
+                    content_parts.append(content_delta)
+                if content_delta or reasoning_delta:
+                    on_delta(content_delta, reasoning_delta)
         return RawCompletion(
-            raw_text=content,
+            raw_text="".join(content_parts),
             provider=self.name,
             model=policy.model,
-            cost_usd=float(payload.get("usage", {}).get("total_tokens", 0)) / 1_000_000,
+            cost_usd=cost_usd,
         )

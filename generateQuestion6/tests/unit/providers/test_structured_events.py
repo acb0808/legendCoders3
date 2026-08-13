@@ -41,6 +41,37 @@ class _RaisingProvider:
         raise RuntimeError("sk-ULTRA_SECRET_123 provider boom")
 
 
+class _StreamingProvider:
+    """on_delta 를 지원하는 공급자 — 토큰 조각을 콜백으로 전달한다."""
+
+    name = "fake"
+
+    def complete(self, prompt, policy, on_delta=None):
+        if on_delta is not None:
+            on_delta("", "We need to keep the original concept.")
+            on_delta('{"idea_id": "idea-0", "title": "질문 역전", ', "")
+            on_delta(
+                '"preserved_concepts": ["원"], "changed_dimensions": ["objective"]}',
+                "",
+            )
+        return type(
+            "Completion",
+            (),
+            {
+                "provider": "fake",
+                "raw_text": (
+                    '{"idea_id": "idea-0", "title": "질문 역전", '
+                    '"preserved_concepts": ["원"], '
+                    '"changed_dimensions": ["objective"], '
+                    '"change_description": ["질문 방향 역전"], '
+                    '"construction_blueprint": "조건과 결론을 뒤집는다"}'
+                ),
+                "latency_ms": 10,
+                "cost_usd": 0.0,
+            },
+        )()
+
+
 def test_engine_emits_llm_call_event() -> None:
     from math_variant.agents.schemas import register_agent_schemas
 
@@ -128,6 +159,64 @@ def test_engine_without_on_event_still_works() -> None:
         policy=None,
     )
     assert response.ok
+
+
+def test_engine_emits_llm_delta_events_from_streaming_provider() -> None:
+    from math_variant.agents.schemas import register_agent_schemas
+
+    schemas = SchemaRegistry()
+    register_agent_schemas(schemas)
+    emitted: list[PipelineEvent] = []
+    engine = StructuredOutputEngine(
+        primary=None, fallback=None, schemas=schemas, on_event=emitted.append
+    )
+    engine.role_resolver = _FakeResolver(provider=_StreamingProvider())
+
+    response = engine.generate_structured(
+        StructuredRequest(
+            request_id="ideator-stream",
+            role=RolePolicy.IDEATOR,
+            prompt="p",
+            response_schema="IdeationOutput",
+        ),
+        policy=None,
+    )
+    assert response.ok
+    delta_events = [e for e in emitted if e.type == "llm_delta"]
+    call_events = [e for e in emitted if e.type == "llm_call"]
+    assert len(delta_events) == 3
+    assert delta_events[0].status == "streaming"
+    assert delta_events[0].data["role"] == "ideator"
+    assert delta_events[0].data["reasoning"] == "We need to keep the original concept."
+    assert delta_events[0].data["attempt"] == 1
+    assert delta_events[1].data["content"].startswith('{"idea_id"')
+    assert call_events[0].data["summary"]["title"] == "질문 역전"
+
+
+def test_engine_falls_back_when_provider_rejects_on_delta() -> None:
+    """on_delta 를 지원하지 않는 공급자(구형 fake)는 TypeError 로 감지해 비스트리밍 호출한다."""
+    from math_variant.agents.schemas import register_agent_schemas
+
+    schemas = SchemaRegistry()
+    register_agent_schemas(schemas)
+    emitted: list[PipelineEvent] = []
+    engine = StructuredOutputEngine(
+        primary=None, fallback=None, schemas=schemas, on_event=emitted.append
+    )
+    engine.role_resolver = _FakeResolver()
+
+    response = engine.generate_structured(
+        StructuredRequest(
+            request_id="ideator-legacy",
+            role=RolePolicy.IDEATOR,
+            prompt="p",
+            response_schema="IdeationOutput",
+        ),
+        policy=None,
+    )
+    assert response.ok
+    assert all(e.type != "llm_delta" for e in emitted)
+    assert any(e.type == "llm_call" and e.data["ok"] for e in emitted)
 
 
 class _FakeResolver:
