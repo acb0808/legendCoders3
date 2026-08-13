@@ -89,28 +89,6 @@ export function CallLog({ events }: { events: JobEvent[] }) {
 
   return (
     <div className="call-log">
-      {hasStreaming && (
-        <section className="call-log-streams" data-testid="call-streams">
-          <h3>실시간 응답</h3>
-          {activeStreams.map((stream) => (
-            <article key={stream.key} className="call-stream-row" data-testid="call-stream-row">
-              <div className="call-stream-head">
-                <span className="call-stream-role">{stream.role}</span>
-                <code className="call-log-model">{stream.model}</code>
-                <span className="call-stream-cursor" aria-hidden="true" />
-              </div>
-              {stream.reasoning && (
-                <details className="call-stream-reasoning" open>
-                  <summary>생각 중…</summary>
-                  <pre>{stream.reasoning}</pre>
-                </details>
-              )}
-              {stream.content && <pre className="call-stream-content">{stream.content}</pre>}
-            </article>
-          ))}
-        </section>
-      )}
-
       <ol className="call-log-list" data-testid="call-log">
         {calls.map((event) => {
           const data = event.data;
@@ -143,6 +121,28 @@ export function CallLog({ events }: { events: JobEvent[] }) {
           );
         })}
       </ol>
+
+      {hasStreaming && (
+        <section className="call-log-streams" data-testid="call-streams">
+          <h3>실시간 응답</h3>
+          {activeStreams.map((stream) => (
+            <article key={stream.key} className="call-stream-row" data-testid="call-stream-row">
+              <div className="call-stream-head">
+                <span className="call-stream-role">{stream.role}</span>
+                <code className="call-log-model">{stream.model}</code>
+                <span className="call-stream-cursor" aria-hidden="true" />
+              </div>
+              {stream.reasoning && (
+                <details className="call-stream-reasoning" open>
+                  <summary>생각 중…</summary>
+                  <pre>{stream.reasoning}</pre>
+                </details>
+              )}
+              {stream.content && <pre className="call-stream-content">{stream.content}</pre>}
+            </article>
+          ))}
+        </section>
+      )}
     </div>
   );
 }

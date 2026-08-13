@@ -1386,12 +1386,12 @@ a {
   gap: 8px;
 }
 
-/* 실시간 스트리밍 응답 패널 */
+/* 실시간 스트리밍 응답 패널 — 완료 로그 아래에 붙는다 (진행 중인 작업이 맨 아래) */
 .call-log-streams {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  margin-bottom: 14px;
+  margin-top: 14px;
 }
 
 .call-log-streams h3 {
