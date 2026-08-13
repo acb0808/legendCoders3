@@ -74,22 +74,22 @@ def test_empty_response_retries_with_original_prompt() -> None:
 
 
 def test_empty_response_exhausts_to_emitted_failure() -> None:
-    provider = FakeProvider("fake", ["", "", "", "", "", ""])  # 전부 빈 응답
+    provider = FakeProvider("fake", ["", "", "", "", "", "", "", ""])  # 전부 빈 응답
 
     engine = StructuredOutputEngine(
         primary=provider,
         fallback=None,
         schemas=_registry(),
-        max_transient_retries=4,
+        max_transient_retries=7,
     )
     response = engine.generate_structured(_request(), _policy())
 
     assert response.ok is False
     assert response.error is not None
     assert response.error.code == ProviderErrorCode.EMPTY_RESPONSE
-    # 1회 + 최대 재시도 4회 = 5회 시도
-    assert len(provider.calls) == 5
-    assert response.attempts == 5
+    # 1회 + 최대 재시도 7회 = 8회 시도
+    assert len(provider.calls) == 8
+    assert response.attempts == 8
 
 
 def test_transient_retries_disabled_matches_old_behavior() -> None:

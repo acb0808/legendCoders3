@@ -55,13 +55,13 @@ class StructuredOutputEngine:
         logger: logging.Logger | None = None,
         role_resolver: RoleResolver | None = None,
         on_event: Callable[[PipelineEvent], None] | None = None,
-        max_transient_retries: int = 4,
+        max_transient_retries: int = 7,
     ) -> None:
         self.primary = primary
         self.fallback = fallback
         self.schemas = schemas
         self.max_repair_attempts = max(0, min(1, max_repair_attempts))
-        self.max_transient_retries = max(0, min(5, max_transient_retries))
+        self.max_transient_retries = max(0, min(8, max_transient_retries))
         self.logger = logger or logging.getLogger("math_variant.providers")
         self.role_resolver = role_resolver
         self.on_event = on_event
