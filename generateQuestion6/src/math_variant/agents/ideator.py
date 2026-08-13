@@ -1,6 +1,7 @@
 """발상자 에이전트 — 원문 없이 구조적 변형 아이디어 제안 (T07).
 
-입력에는 원문 본문이 절대 포함되지 않는다. 높은 temperature(1.4) 로 발산을 유도한다.
+입력에는 원문 본문이 절대 포함되지 않는다. 발산은 기본 텍스트 역할보다 높은
+temperature(0.9) 로 유도한다. (deepseek-v4-flash 는 1.4 에서 json_object 빈 응답이 잦아 0.9 로 조정)
 """
 
 from __future__ import annotations

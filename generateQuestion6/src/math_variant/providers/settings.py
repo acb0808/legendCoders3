@@ -20,7 +20,7 @@ def _default_roles(flash_model: str) -> dict[RolePolicy, RolePolicyEntry]:
         RolePolicy.BLIND_SOLVER: 0.2,
         RolePolicy.CRITIC: 0.2,
         RolePolicy.PLANNER: 0.2,
-        RolePolicy.IDEATOR: 1.4,
+        RolePolicy.IDEATOR: 0.9,
         RolePolicy.SELECTOR: 0.3,
         RolePolicy.CODE_REVIEWER: 0.2,
         RolePolicy.JUDGE: 0.2,

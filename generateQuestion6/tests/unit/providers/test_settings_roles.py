@@ -14,7 +14,7 @@ EXPECTED_DEFAULT_TEMPERATURES = {
     RolePolicy.BLIND_SOLVER: 0.2,
     RolePolicy.CRITIC: 0.2,
     RolePolicy.PLANNER: 0.2,
-    RolePolicy.IDEATOR: 1.4,
+    RolePolicy.IDEATOR: 0.9,  # deepseek-v4-flash 는 1.4 에서 빈 응답이 잦아 0.9 로 조정
     RolePolicy.SELECTOR: 0.3,
     RolePolicy.CODE_REVIEWER: 0.2,
     RolePolicy.JUDGE: 0.2,
@@ -25,7 +25,9 @@ EXPECTED_DEFAULT_TEMPERATURES = {
 def test_default_roles_include_new_agents_with_high_ideator_temperature() -> None:
     roles = ProviderSettings(_env_file=None).role_policy().roles
     assert roles[RolePolicy.PLANNER].provider == "deepseek"
-    assert roles[RolePolicy.IDEATOR].temperature == 1.4
+    # deepseek-v4-flash 는 1.4 에서 json_object 빈 응답이 잦아 0.9 로 조정했다
+    assert roles[RolePolicy.IDEATOR].temperature == 0.9
+    assert roles[RolePolicy.IDEATOR].temperature > 0.5
     assert roles[RolePolicy.SELECTOR].temperature == 0.3
     assert roles[RolePolicy.CODE_REVIEWER].temperature == 0.2
     assert roles[RolePolicy.JUDGE].temperature == 0.2
