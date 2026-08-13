@@ -45,6 +45,7 @@ from math_variant.agents.vision_artist import VisionArtist
 from math_variant.domain.candidate import CandidateProblem
 from math_variant.errors import ErrorCode, MathVariantError, StructuredError
 from math_variant.events import EventStage, PipelineEvent
+from math_variant.reference.knowledge_graph import assign_skill_ids
 from math_variant.reference.sections import (
     generator_condition_section,
     generator_style_section,
@@ -284,6 +285,7 @@ class AgentPipeline:
             forbidden_structure=planner_out.forbidden_structure,
             condition_section=c_sec,
             style_section=s_sec,
+            core_concepts=planner_out.core_concepts,
         )
         rank_entries = [
             {
@@ -324,6 +326,7 @@ class AgentPipeline:
         forbidden_structure: list[str] | None = None,
         condition_section: str = "",
         style_section: str = "",
+        core_concepts: list[str] | None = None,
     ) -> list[CandidateVerdict]:
         verdicts: list[CandidateVerdict] = []
         for index, blueprint in enumerate(blueprints):
@@ -341,6 +344,7 @@ class AgentPipeline:
                     forbidden_structure=forbidden_structure,
                     condition_section=condition_section,
                     style_section=style_section,
+                    core_concepts=core_concepts,
                 )
             except Exception as exc:
                 self.logger.warning(
@@ -372,6 +376,7 @@ class AgentPipeline:
         attempts: int = 1,
         condition_section: str = "",
         style_section: str = "",
+        core_concepts: list[str] | None = None,
     ) -> CandidateVerdict:
         blueprint_dict = {
             "idea_id": blueprint.idea_id,
@@ -390,6 +395,12 @@ class AgentPipeline:
             condition_section=condition_section,
             style_section=style_section,
         )
+
+        skill_evidences = assign_skill_ids(
+            candidate.solution_steps,
+            concepts=core_concepts or blueprint.preserved_concepts,
+        )
+        candidate.transformation_evidence.extend(skill_evidences)
 
         from math_variant.services.similarity import similarity_report
 
@@ -426,6 +437,7 @@ class AgentPipeline:
                 attempts=attempts + 1,
                 condition_section=condition_section,
                 style_section=style_section,
+                core_concepts=core_concepts,
             )
 
         self._emit(EventStage.GENERATION, "done", "생성 완료", candidate_id)

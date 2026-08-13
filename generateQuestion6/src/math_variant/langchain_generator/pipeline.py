@@ -66,6 +66,7 @@ from math_variant.langchain_generator.settings import (
 )
 from math_variant.providers.contracts import RolePolicy
 from math_variant.providers.settings import ProviderSettings
+from math_variant.reference.knowledge_graph import assign_skill_ids
 from math_variant.reference.models import (
     ConditionPhrasing,
     ExamPatternCard,
@@ -379,6 +380,19 @@ def _generate_node(state: PipelineState, runtime: Runtime[PipelineContext]) -> d
             extra={"candidate": state["candidate_id"], "error": str(exc)[:300]},
         )
         return {"failed": True}
+
+    planner_out = state.get("planner_out")
+    blueprint = state.get("blueprint")
+    core_concepts = (
+        planner_out.core_concepts
+        if planner_out is not None
+        else (blueprint.preserved_concepts if blueprint is not None else [])
+    )
+    skill_evidences = assign_skill_ids(
+        candidate.solution_steps,
+        concepts=core_concepts,
+    )
+    candidate.transformation_evidence.extend(skill_evidences)
 
     from math_variant.services.similarity import similarity_report
 
