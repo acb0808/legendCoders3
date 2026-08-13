@@ -8,7 +8,7 @@
   4. 검증(후보별): CODE_REVIEW → 샌드박스 실행 → BLIND A/B → CRITIC
   5. 집계(JUDGE) + 개선 루프(REVISE 재생성, 최대 max_refine 회)
 
-원문 접근 경계: 원문 본문은 PLANNER 에만 전달된다.
+원문 접근 경계: 원문 본문은 PLANNER 와 후보 검증 단계(유사성 필터·CRITIC 참신성 비교)에만 전달된다.
 후보의 PASS 는 "검증 스크립트가 샌드박스에서 PASS 판정"을 받을 때만 부여된다 (fail-closed).
 """
 
@@ -20,6 +20,7 @@ import uuid
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
+from functools import partial
 from pathlib import Path
 from typing import Any, Literal, Protocol
 
@@ -189,7 +190,6 @@ class AgentPipeline:
             answer_type=planner_out.answer_type,
             domain=planner_out.domain,
             preservation_goals=planner_out.preservation_goals,
-            forbidden_structure=planner_out.forbidden_structure,
             strategy=planner_out.strategy,
         )
         self._emit(EventStage.IDEATION, "started", f"변형 아이디어 {self.ideator_count}개 발상")
@@ -198,7 +198,14 @@ class AgentPipeline:
         ideas: list[IdeationOutput] = []
         with ThreadPoolExecutor(max_workers=self.max_workers) as pool:
             futures = {
-                pool.submit(self.ideator.ideate, ideation_brief, seed=str(seed)): seed
+                pool.submit(
+                    partial(
+                        self.ideator.ideate,
+                        forbidden_structure=planner_out.forbidden_structure,
+                    ),
+                    ideation_brief,
+                    str(seed),
+                ): seed
                 for seed in range(self.ideator_count)
             }
             for future in futures:
@@ -233,7 +240,14 @@ class AgentPipeline:
             self._write_report(run_id, report)
             return report
 
-        candidates = self._generate_and_verify(run_id, adopted, ideation_brief, strategy_brief)
+        candidates = self._generate_and_verify(
+            run_id,
+            adopted,
+            ideation_brief,
+            strategy_brief,
+            source_text=source_text,
+            forbidden_structure=planner_out.forbidden_structure,
+        )
         rank_entries = [
             {
                 "candidate_id": v.candidate.candidate_id,
@@ -269,6 +283,8 @@ class AgentPipeline:
         blueprints: list[IdeationOutput],
         ideation_brief: str,
         strategy_brief: str,
+        source_text: str = "",
+        forbidden_structure: list[str] | None = None,
     ) -> list[CandidateVerdict]:
         verdicts: list[CandidateVerdict] = []
         for index, blueprint in enumerate(blueprints):
@@ -277,7 +293,13 @@ class AgentPipeline:
             # 개별 실패를 삼키고 성공한 후보로 진행한다.
             try:
                 verdict = self._grow_candidate(
-                    run_id, candidate_id, blueprint, ideation_brief, strategy_brief
+                    run_id,
+                    candidate_id,
+                    blueprint,
+                    ideation_brief,
+                    strategy_brief,
+                    source_text=source_text,
+                    forbidden_structure=forbidden_structure,
                 )
             except Exception as exc:
                 self.logger.warning(
@@ -303,6 +325,8 @@ class AgentPipeline:
         blueprint: IdeationOutput,
         ideation_brief: str,
         strategy_brief: str,
+        source_text: str = "",
+        forbidden_structure: list[str] | None = None,
         feedback: str = "",
         attempts: int = 1,
     ) -> CandidateVerdict:
@@ -319,7 +343,44 @@ class AgentPipeline:
             blueprint=blueprint_dict,
             brief=ideation_brief,
             feedback=feedback,
+            forbidden_structure=forbidden_structure,
         )
+
+        from math_variant.services.similarity import similarity_report
+
+        report = similarity_report(source_text, candidate.problem_text)
+        if report.too_similar:
+            feedback = (
+                f"[참신성 피드백] 원문과 '{report.match_snippet}' 구간이 일치합니다. "
+                "같은 단원에서 이 구성과 다른 수학 아이디어로 문제를 다시 구성하세요."
+            )
+            self._emit(
+                EventStage.GENERATION,
+                "failed",
+                f"원문과 표현이 유사 (일치 {report.lcs_len}자) — 재생성",
+                candidate_id,
+            )
+            if attempts >= self.max_refine:
+                # 재시도 한도 소진 → 후보 폐기
+                self.logger.warning("candidate_similar", extra={"candidate": candidate_id})
+                return CandidateVerdict(
+                    candidate=candidate,
+                    blueprint_title=blueprint.title,
+                    attempts=attempts,
+                    status="UNRESOLVED",
+                )
+            return self._grow_candidate(
+                run_id,
+                candidate_id,
+                blueprint,
+                ideation_brief,
+                strategy_brief,
+                source_text=source_text,
+                forbidden_structure=forbidden_structure,
+                feedback=feedback,
+                attempts=attempts + 1,
+            )
+
         self._emit(EventStage.GENERATION, "done", "생성 완료", candidate_id)
         self._emit(EventStage.CODE_REVIEW, "started", "검증 스크립트 심사", candidate_id)
         review = self.code_reviewer.review(
@@ -350,7 +411,12 @@ class AgentPipeline:
         self._emit(EventStage.BLIND, "done", f"합의: {consensus.status}", candidate_id)
         self._emit(EventStage.CRITIC, "started", "품질 비평", candidate_id)
         critic = self.critic.criticize(
-            candidate.problem_text, ideation_brief, strategy_brief, candidate_id=candidate_id
+            candidate.problem_text,
+            ideation_brief,
+            strategy_brief,
+            candidate_id=candidate_id,
+            source_text=source_text,
+            forbidden_structure=forbidden_structure,
         )
         self._emit(EventStage.CRITIC, "done", f"점수: {critic.score}", candidate_id)
 
@@ -385,6 +451,8 @@ class AgentPipeline:
                 blueprint,
                 ideation_brief,
                 strategy_brief,
+                source_text=source_text,
+                forbidden_structure=forbidden_structure,
                 feedback=feedback,
                 attempts=attempts + 1,
             )
