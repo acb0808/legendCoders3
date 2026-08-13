@@ -70,6 +70,16 @@ class _Engine(StructuredOutputEngine):
         return ProviderResponse(request_id=request.request_id, ok=True, data=self._data)
 
 
+class _FakeEngine(StructuredOutputEngine):
+    def __init__(self) -> None:
+        super().__init__(primary=None, fallback=None, schemas=SchemaRegistry())
+        self._data = _CANDIDATE
+        self._roles = {"generator"}
+
+    def generate_structured(self, request, policy=None) -> ProviderResponse:
+        return ProviderResponse(request_id=request.request_id, ok=True, data=self._data)
+
+
 class _BrokenEngine(StructuredOutputEngine):
     def __init__(self, data: dict, roles: set[str]) -> None:
         super().__init__(primary=None, fallback=None, schemas=SchemaRegistry())
@@ -100,6 +110,38 @@ def test_generator_refine_includes_feedback_in_prompt() -> None:
         feedback="검증 스크립트가 거짓 테스트다",
     )
     assert "검증 스크립트가 거짓 테스트다" in agent._last_prompt
+
+
+def test_generator_prompt_includes_forbidden_structure() -> None:
+    agent = GeneratorAgent(_FakeEngine(), "생성 프롬프트")
+    agent.generate(
+        candidate_id="cand-1",
+        blueprint={
+            "idea_id": "idea-0",
+            "preserved_concepts": ["p"],
+            "changed_dimensions": ["objective"],
+            "construction_blueprint": "b",
+        },
+        brief="문제 구조",
+        forbidden_structure=["직선 위 점에서 수선", "삼각형 넓이"],
+    )
+    assert "직선 위 점에서 수선" in agent._last_prompt
+    assert "재사용 금지" in agent._last_prompt
+
+
+def test_generator_prompt_without_forbidden_structure() -> None:
+    agent = GeneratorAgent(_FakeEngine(), "생성 프롬프트")
+    agent.generate(
+        candidate_id="cand-1",
+        blueprint={
+            "idea_id": "idea-0",
+            "preserved_concepts": ["p"],
+            "changed_dimensions": ["objective"],
+            "construction_blueprint": "b",
+        },
+        brief="문제 구조",
+    )
+    assert "금지 구조" not in agent._last_prompt
 
 
 def test_code_reviewer_returns_review() -> None:

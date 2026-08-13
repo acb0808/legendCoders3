@@ -25,8 +25,11 @@ class GeneratorAgent:
         blueprint: dict[str, Any],
         brief: str,
         feedback: str = "",
+        forbidden_structure: list[str] | None = None,
     ) -> tuple[CandidateProblem, GeneratorOutput]:
-        self._last_prompt = self._build_prompt(blueprint, brief, feedback)
+        self._last_prompt = self._build_prompt(
+            blueprint, brief, feedback, forbidden_structure=forbidden_structure
+        )
         data = request_structured(
             self.engine,
             request_id=candidate_id,
@@ -46,7 +49,13 @@ class GeneratorAgent:
         )
         return candidate, output
 
-    def _build_prompt(self, blueprint: dict[str, Any], brief: str, feedback: str) -> str:
+    def _build_prompt(
+        self,
+        blueprint: dict[str, Any],
+        brief: str,
+        feedback: str,
+        forbidden_structure: list[str] | None = None,
+    ) -> str:
         prompt = (
             f"{self.prompt_bundle}\n\n"
             f"[문제 구조]\n{brief}\n"
@@ -57,4 +66,6 @@ class GeneratorAgent:
         )
         if feedback.strip():
             prompt += f"[수정 지시]\n{feedback}\n"
+        if forbidden_structure:
+            prompt += f"[금지 구조 (원본 구성 골격, 재사용 금지)]\n- {forbidden_structure}\n"
         return prompt
