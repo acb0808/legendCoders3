@@ -103,6 +103,20 @@ def test_ideator_never_sees_original() -> None:
     assert "y=x^2" not in engine.prompts[0]
 
 
+def test_ideation_brief_includes_forbidden_structure() -> None:
+    brief = build_ideation_brief(
+        core_concepts=["포물선"],
+        objective="o",
+        answer_type="expression",
+        domain="d",
+        preservation_goals=["p"],
+        forbidden_structure=["직선 위 점에서 수선", "삼각형 넓이"],
+        strategy=ProductionStrategy.model_validate(_PLANNER_DATA["strategy"]),
+    )
+    assert "직선 위 점에서 수선" in brief
+    assert "재사용 금지" in brief
+
+
 def test_selector_adopts_ideas() -> None:
     engine = _Engine(
         {"adopted_ideas": ["idea-1", "idea-3"], "rationale": "전략 부합"},

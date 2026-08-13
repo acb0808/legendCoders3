@@ -189,6 +189,7 @@ class AgentPipeline:
             answer_type=planner_out.answer_type,
             domain=planner_out.domain,
             preservation_goals=planner_out.preservation_goals,
+            forbidden_structure=planner_out.forbidden_structure,
             strategy=planner_out.strategy,
         )
         self._emit(EventStage.IDEATION, "started", f"변형 아이디어 {self.ideator_count}개 발상")

@@ -18,6 +18,7 @@ def build_ideation_brief(
     answer_type: str,
     domain: str,
     preservation_goals: list[str],
+    forbidden_structure: list[str] | None = None,
     strategy: ProductionStrategy,
 ) -> str:
     """스펙·전략만 담은 발상 입력 브리프를 만든다 (원문 본문 없음)."""
@@ -28,6 +29,7 @@ def build_ideation_brief(
         f"- 답 형태: {answer_type}\n"
         f"- 도메인: {domain}\n"
         f"- 보존 목표: {preservation_goals}\n"
+        f"- 금지 구조(원본 구성 골격, 재사용 금지): {forbidden_structure or []}\n"
         "[변형 전략]\n"
         f"- 난이도 목표: {strategy.difficulty_target}\n"
         f"- 변형 방향: {strategy.variation_direction}\n"

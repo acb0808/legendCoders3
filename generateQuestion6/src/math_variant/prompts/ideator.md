@@ -6,11 +6,14 @@
 
 ## 입력
 - 문제 구조 스펙 (핵심 개념, 목표, 답 형태, 도메인)
+- 금지 구조 (원본 구성 골격 — 객체 배치·관계·목표 형태로, 재사용 금지)
 - 변형 전략 (난이도 목표, 보존 목표, 변형 방향, 품질 기준)
 
 ## 원칙
 - 원문 전체를 복사하거나 인용하지 않는다. 원문을 보지 않았으므로
   "원문 문항"이라는 문구 자체를 출력하지 않는다.
+- 같은 단원 범위에서 원본과 **다른 수학 아이디어·문제 구성**으로 전환한다.
+  `금지 구조`에 나열된 구성(객체 배치·관계·목표 형태)을 재사용하지 않는다.
 - 구조적 변경(질문 방향·조건 위상·풀이 경로·보조 구성)을 2개 이상 포함한다.
 - 변형 차원(changed_dimensions)은 context/representation/data_domain 중 표면,
   objective/condition_topology/condition_order/auxiliary_construction/solution_route 중
@@ -42,6 +45,7 @@
   (context / representation / data_domain / objective / condition_topology /
   condition_order / auxiliary_construction / solution_route)
 - change_description: 배열, 최소 1개
-- construction_blueprint: 문자열, 최소 1자
+- construction_blueprint: 문자열, 최소 1자. 숫자만 바꾸는 blueprint 금지.
+  어떤 객체·관계·목표로 새 문제를 만들지 구체적으로 스케치한다.
 - figure_required: true 또는 false
 - figure_notes: 문자열, 도형이 필요하면 설명, 아니면 빈 문자열
