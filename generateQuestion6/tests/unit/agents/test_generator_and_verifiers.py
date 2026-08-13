@@ -69,6 +69,10 @@ class _Engine(StructuredOutputEngine):
         assert request.role.value in self._roles
         return ProviderResponse(request_id=request.request_id, ok=True, data=self._data)
 
+    @property
+    def last_prompt(self) -> str:
+        return self.prompts[-1]
+
 
 class _FakeEngine(StructuredOutputEngine):
     def __init__(self) -> None:
@@ -150,6 +154,40 @@ def test_code_reviewer_returns_review() -> None:
     review = agent.review("script", "문제 본문", "8sqrt(2)", candidate_id="cand-1")
     assert isinstance(review, CodeReviewOutput)
     assert review.approves
+
+
+def test_critic_prompt_includes_source_and_forbidden() -> None:
+    engine = _Engine(_CRITIC, {"critic"})
+    agent = CriticAgent(engine, "비평 프롬프트")
+    agent.criticize(
+        "문제 후보",
+        "스펙",
+        "전략",
+        source_text="직선 위 점에서 축에 수선을 내린다",
+        forbidden_structure=["직선 위 점에서 수선", "삼각형 넓이"],
+    )
+    prompt = engine.last_prompt
+    assert "원본 문항" in prompt
+    assert "직선 위 점에서 수선" in prompt
+    assert "삼각형 넓이" in prompt
+    assert "재사용" in prompt or "골격" in prompt
+
+
+def test_critic_prompt_without_source() -> None:
+    engine = _Engine(_CRITIC, {"critic"})
+    agent = CriticAgent(engine, "비평 프롬프트")
+    agent.criticize("문제 후보", "스펙", "전략")
+    assert "원본 문항" not in engine.last_prompt
+
+
+def test_critic_prompt_with_forbidden_structure_only() -> None:
+    engine = _Engine(_CRITIC, {"critic"})
+    agent = CriticAgent(engine, "비평 프롬프트")
+    agent.criticize("문제 후보", "스펙", "전략", forbidden_structure=["삼각형 넓이"])
+    prompt = engine.last_prompt
+    assert "원본 문항" not in prompt
+    assert "삼각형 넓이" in prompt
+    assert "\n\n[원본 구성 골격" in prompt
 
 
 def test_critic_and_judge() -> None:
