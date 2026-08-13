@@ -1,0 +1,9 @@
+{
+  "problem_id": "problem-0057211c",
+  "title": "run-2f567ee2 cand-1",
+  "text": "좌표평면 위에 평행사변형 ABCD가 있다. 두 꼭짓점 A(2,1), C(6,5)는 서로 마주보는 꼭짓점이고, 꼭짓점 B는 직선 l1: y=x+1 위에 있다. 이때 꼭짓점 D가 놓이는 직선 l2의 방정식을 구하시오.",
+  "source": "approved",
+  "source_run_id": "run-2f567ee2",
+  "text_hash": "dc14a610381c9d1f0ea637ba8aca839639a49e0183eae6ed9a6cbb6234fb4497",
+  "created_at": "2026-08-13T05:22:02.188930Z"
+}

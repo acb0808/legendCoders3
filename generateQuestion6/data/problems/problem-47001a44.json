@@ -1,0 +1,9 @@
+{
+  "problem_id": "problem-47001a44",
+  "title": "[2023년 기출] 광명고1-2 중간 18번",
+  "text": "[논술형2] <eq>8</eq>인 평행한 두 직선 <eq>l</eq>, <eq>m</eq>이 있다. 직선 <eq>l</eq> 위의 두 점 <eq>A</eq>, <eq>B</eq>와 직선 <eq>m</eq> 위의 점 <eq>C</eq>에 대하여 <eq>\\overline{AB} \\bot \\overline{BC}</eq>이고 <eq>\\overline{AB}=8</eq>이다. 선분 <eq>BC</eq> 위의 점 <eq>P</eq>에 대하여 직선 <eq>AP</eq>와 직선 <eq>m</eq>의 교점을 <eq>D</eq>라 할 때, 두 삼각형 <eq>APB</eq>, <eq>DPC</eq>의 넓이의 합의 최솟값을 구하고 그 과정을 서술하시오. (단, <eq>\\overline{BP}=x</eq>, <eq>\\overline{CD}=y</eq>라 두고 서술하시오.)",
+  "source": "manual",
+  "source_run_id": null,
+  "text_hash": "fbefa5dbcd2bcabe4d21cb61940daf37c1da9746c5b86dcb3cbaecfdae823f9b",
+  "created_at": "2026-08-13T11:08:49.599229Z"
+}

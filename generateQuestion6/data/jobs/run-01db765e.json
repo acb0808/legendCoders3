@@ -1,0 +1,1051 @@
+{
+  "job_id": "run-01db765e",
+  "run_id": "run-01db765e",
+  "source": {
+    "mode": "problem",
+    "text": "[논술형2] <eq>8</eq>인 평행한 두 직선 <eq>l</eq>, <eq>m</eq>이 있다. 직선 <eq>l</eq> 위의 두 점 <eq>A</eq>, <eq>B</eq>와 직선 <eq>m</eq> 위의 점 <eq>C</eq>에 대하여 <eq>\\overline{AB} \\bot \\overline{BC}</eq>이고 <eq>\\overline{AB}=8</eq>이다. 선분 <eq>BC</eq> 위의 점 <eq>P</eq>에 대하여 직선 <eq>AP</eq>와 직선 <eq>m</eq>의 교점을 <eq>D</eq>라 할 때, 두 삼각형 <eq>APB</eq>, <eq>DPC</eq>의 넓이의 합의 최솟값을 구하고 그 과정을 서술하시오. (단, <eq>\\overline{BP}=x</eq>, <eq>\\overline{CD}=y</eq>라 두고 서술하시오.)",
+    "label": "[2023년 기출] 광명고1-2 중간 18번"
+  },
+  "options": {
+    "difficulty_target": "",
+    "ideator_count": 3,
+    "max_refine": 2
+  },
+  "status": "completed",
+  "events": [
+    {
+      "event_id": "stage-1",
+      "type": "stage",
+      "stage": "planner",
+      "status": "started",
+      "message": "원문을 분석하여 변형 전략을 수립한다",
+      "candidate_id": null,
+      "ts": "2026-08-13T11:08:52.151400Z",
+      "data": {}
+    },
+    {
+      "event_id": "llm-4191",
+      "type": "llm_call",
+      "stage": "planner",
+      "status": "done",
+      "message": "",
+      "candidate_id": null,
+      "ts": "2026-08-13T11:09:31.697682Z",
+      "data": {
+        "role": "planner",
+        "schema": "PlannerOutput",
+        "provider": "deepseek",
+        "model": "deepseek-v4-flash",
+        "attempts": 1,
+        "latency_ms": 0,
+        "cost_usd": 0.005229,
+        "ok": true,
+        "summary": {
+          "core_concepts": [
+            "평행한 두 직선",
+            "삼각형의 넓이",
+            "최솟값"
+          ],
+          "domain": "도형의 방정식",
+          "objective": "두 삼각형 APB, DPC의 넓이의 합의 최솟값을 구하고 그 과정을 서술하시오"
+        },
+        "error": null
+      }
+    },
+    {
+      "event_id": "stage-2",
+      "type": "stage",
+      "stage": "planner",
+      "status": "done",
+      "message": "변형 스펙·전략 수립 완료",
+      "candidate_id": null,
+      "ts": "2026-08-13T11:09:31.697682Z",
+      "data": {}
+    },
+    {
+      "event_id": "stage-3",
+      "type": "stage",
+      "stage": "ideation",
+      "status": "started",
+      "message": "변형 아이디어 3개 발상",
+      "candidate_id": null,
+      "ts": "2026-08-13T11:09:31.707825Z",
+      "data": {}
+    },
+    {
+      "event_id": "llm-27942",
+      "type": "llm_call",
+      "stage": "ideation",
+      "status": "done",
+      "message": "",
+      "candidate_id": null,
+      "ts": "2026-08-13T11:10:45.868135Z",
+      "data": {
+        "role": "ideator",
+        "schema": "IdeationOutput",
+        "provider": "deepseek",
+        "model": "deepseek-v4-flash",
+        "attempts": 1,
+        "latency_ms": 0,
+        "cost_usd": 0.009614,
+        "ok": true,
+        "summary": {
+          "idea_id": "idea-0",
+          "title": "최솟값이 주어진 평행선 사이의 거리 구하기",
+          "changed_dimensions": [
+            "objective",
+            "condition_topology",
+            "data_domain",
+            "solution_route"
+          ]
+        },
+        "error": null
+      }
+    },
+    {
+      "event_id": "llm-30630",
+      "type": "llm_call",
+      "stage": "ideation",
+      "status": "done",
+      "message": "",
+      "candidate_id": null,
+      "ts": "2026-08-13T11:10:56.278546Z",
+      "data": {
+        "role": "ideator",
+        "schema": "IdeationOutput",
+        "provider": "deepseek",
+        "model": "deepseek-v4-flash",
+        "attempts": 1,
+        "latency_ms": 0,
+        "cost_usd": 0.0109,
+        "ok": true,
+        "summary": {
+          "idea_id": "idea-0",
+          "title": "질문 역전과 수선의 발 도입",
+          "changed_dimensions": [
+            "objective",
+            "condition_topology",
+            "auxiliary_construction",
+            "solution_route",
+            "data_domain"
+          ]
+        },
+        "error": null
+      }
+    },
+    {
+      "event_id": "llm-33414",
+      "type": "llm_call",
+      "stage": "ideation",
+      "status": "done",
+      "message": "",
+      "candidate_id": null,
+      "ts": "2026-08-13T11:11:17.723947Z",
+      "data": {
+        "role": "ideator",
+        "schema": "IdeationOutput",
+        "provider": "deepseek",
+        "model": "deepseek-v4-flash",
+        "attempts": 1,
+        "latency_ms": 0,
+        "cost_usd": 0.012686,
+        "ok": true,
+        "summary": {
+          "idea_id": "idea-0",
+          "title": "최솟값 역산",
+          "changed_dimensions": [
+            "objective",
+            "condition_topology",
+            "auxiliary_construction",
+            "solution_route",
+            "data_domain"
+          ]
+        },
+        "error": null
+      }
+    },
+    {
+      "event_id": "stage-4",
+      "type": "stage",
+      "stage": "ideation",
+      "status": "done",
+      "message": "발상 완료 (3개)",
+      "candidate_id": null,
+      "ts": "2026-08-13T11:11:17.723947Z",
+      "data": {}
+    },
+    {
+      "event_id": "stage-5",
+      "type": "stage",
+      "stage": "selection",
+      "status": "started",
+      "message": "아이디어 채택 선별",
+      "candidate_id": null,
+      "ts": "2026-08-13T11:11:17.737928Z",
+      "data": {}
+    },
+    {
+      "event_id": "llm-38676",
+      "type": "llm_call",
+      "stage": "selection",
+      "status": "done",
+      "message": "",
+      "candidate_id": null,
+      "ts": "2026-08-13T11:12:05.689814Z",
+      "data": {
+        "role": "selector",
+        "schema": "SelectionOutput",
+        "provider": "deepseek",
+        "model": "deepseek-v4-flash",
+        "attempts": 1,
+        "latency_ms": 0,
+        "cost_usd": 0.006349,
+        "ok": true,
+        "summary": {
+          "adopted_ideas": [
+            "idea-0"
+          ]
+        },
+        "error": null
+      }
+    },
+    {
+      "event_id": "stage-6",
+      "type": "stage",
+      "stage": "selection",
+      "status": "done",
+      "message": "채택 3개",
+      "candidate_id": null,
+      "ts": "2026-08-13T11:12:05.689814Z",
+      "data": {}
+    },
+    {
+      "event_id": "stage-7",
+      "type": "stage",
+      "stage": "generation",
+      "status": "started",
+      "message": "문제 생성",
+      "candidate_id": "cand-1",
+      "ts": "2026-08-13T11:12:05.706799Z",
+      "data": {}
+    },
+    {
+      "event_id": "llm-50047",
+      "type": "llm_call",
+      "stage": "generation",
+      "status": "done",
+      "message": "",
+      "candidate_id": null,
+      "ts": "2026-08-13T11:13:40.293420Z",
+      "data": {
+        "role": "generator",
+        "schema": "GeneratorOutput",
+        "provider": "deepseek",
+        "model": "deepseek-v4-flash",
+        "attempts": 1,
+        "latency_ms": 0,
+        "cost_usd": 0.01316,
+        "ok": true,
+        "summary": {
+          "final_answer_claim": "h = M/(a(√2-1))"
+        },
+        "error": null
+      }
+    },
+    {
+      "event_id": "stage-8",
+      "type": "stage",
+      "stage": "generation",
+      "status": "done",
+      "message": "생성 완료",
+      "candidate_id": "cand-1",
+      "ts": "2026-08-13T11:13:40.293420Z",
+      "data": {}
+    },
+    {
+      "event_id": "stage-9",
+      "type": "stage",
+      "stage": "code_review",
+      "status": "started",
+      "message": "검증 스크립트 심사",
+      "candidate_id": "cand-1",
+      "ts": "2026-08-13T11:13:40.310166Z",
+      "data": {}
+    },
+    {
+      "event_id": "llm-53006",
+      "type": "llm_call",
+      "stage": "code_review",
+      "status": "done",
+      "message": "",
+      "candidate_id": null,
+      "ts": "2026-08-13T11:14:07.765645Z",
+      "data": {
+        "role": "code_reviewer",
+        "schema": "CodeReviewOutput",
+        "provider": "deepseek",
+        "model": "deepseek-v4-flash",
+        "attempts": 2,
+        "latency_ms": 0,
+        "cost_usd": 0.005076000000000001,
+        "ok": true,
+        "summary": {
+          "verdict": "APPROVE"
+        },
+        "error": null
+      }
+    },
+    {
+      "event_id": "stage-10",
+      "type": "stage",
+      "stage": "code_review",
+      "status": "done",
+      "message": "심사: APPROVE",
+      "candidate_id": "cand-1",
+      "ts": "2026-08-13T11:14:07.769077Z",
+      "data": {}
+    },
+    {
+      "event_id": "stage-11",
+      "type": "stage",
+      "stage": "sandbox",
+      "status": "started",
+      "message": "샌드박스 검증 실행",
+      "candidate_id": "cand-1",
+      "ts": "2026-08-13T11:14:07.775094Z",
+      "data": {}
+    },
+    {
+      "event_id": "stage-12",
+      "type": "stage",
+      "stage": "sandbox",
+      "status": "done",
+      "message": "검증: PASS",
+      "candidate_id": "cand-1",
+      "ts": "2026-08-13T11:14:09.404055Z",
+      "data": {}
+    },
+    {
+      "event_id": "stage-13",
+      "type": "stage",
+      "stage": "blind",
+      "status": "started",
+      "message": "블라인드 풀이 A·B",
+      "candidate_id": "cand-1",
+      "ts": "2026-08-13T11:14:09.405660Z",
+      "data": {}
+    },
+    {
+      "event_id": "stage-14",
+      "type": "stage",
+      "stage": "blind",
+      "status": "done",
+      "message": "합의: UNRESOLVED",
+      "candidate_id": "cand-1",
+      "ts": "2026-08-13T11:14:09.412943Z",
+      "data": {}
+    },
+    {
+      "event_id": "stage-15",
+      "type": "stage",
+      "stage": "critic",
+      "status": "started",
+      "message": "품질 비평",
+      "candidate_id": "cand-1",
+      "ts": "2026-08-13T11:14:09.419846Z",
+      "data": {}
+    },
+    {
+      "event_id": "llm-62993",
+      "type": "llm_call",
+      "stage": "critic",
+      "status": "done",
+      "message": "",
+      "candidate_id": null,
+      "ts": "2026-08-13T11:15:44.651611Z",
+      "data": {
+        "role": "critic",
+        "schema": "CriticOutput",
+        "provider": "deepseek",
+        "model": "deepseek-v4-flash",
+        "attempts": 2,
+        "latency_ms": 0,
+        "cost_usd": 0.013330000000000002,
+        "ok": true,
+        "summary": {
+          "score": 7.0,
+          "recommendation": "PASS"
+        },
+        "error": null
+      }
+    },
+    {
+      "event_id": "stage-16",
+      "type": "stage",
+      "stage": "critic",
+      "status": "done",
+      "message": "점수: 7.0",
+      "candidate_id": "cand-1",
+      "ts": "2026-08-13T11:15:44.654250Z",
+      "data": {}
+    },
+    {
+      "event_id": "llm-63558",
+      "type": "llm_call",
+      "stage": "generation",
+      "status": "done",
+      "message": "",
+      "candidate_id": null,
+      "ts": "2026-08-13T11:15:55.388107Z",
+      "data": {
+        "role": "vision",
+        "schema": "VisionOutput",
+        "provider": "openai",
+        "model": "gpt-5.6-luna",
+        "attempts": 1,
+        "latency_ms": 0,
+        "cost_usd": 0.001448,
+        "ok": true,
+        "summary": {
+          "caption": "평행선 $l,m$ 위의 점들과 선분 $AC$, 직선 $BD$에 의해 생기는 두 삼각형 $APB$, $DPC$"
+        },
+        "error": null
+      }
+    },
+    {
+      "event_id": "stage-17",
+      "type": "stage",
+      "stage": "generation",
+      "status": "started",
+      "message": "문제 생성",
+      "candidate_id": "cand-2",
+      "ts": "2026-08-13T11:15:55.390108Z",
+      "data": {}
+    },
+    {
+      "event_id": "llm-69612",
+      "type": "llm_call",
+      "stage": "generation",
+      "status": "done",
+      "message": "",
+      "candidate_id": null,
+      "ts": "2026-08-13T11:16:42.518954Z",
+      "data": {
+        "role": "generator",
+        "schema": "GeneratorOutput",
+        "provider": "deepseek",
+        "model": "deepseek-v4-flash",
+        "attempts": 1,
+        "latency_ms": 0,
+        "cost_usd": 0.007763,
+        "ok": true,
+        "summary": {
+          "final_answer_claim": "h = 8cS/(a(4c-a))"
+        },
+        "error": null
+      }
+    },
+    {
+      "event_id": "stage-18",
+      "type": "stage",
+      "stage": "generation",
+      "status": "done",
+      "message": "생성 완료",
+      "candidate_id": "cand-2",
+      "ts": "2026-08-13T11:16:42.531750Z",
+      "data": {}
+    },
+    {
+      "event_id": "stage-19",
+      "type": "stage",
+      "stage": "code_review",
+      "status": "started",
+      "message": "검증 스크립트 심사",
+      "candidate_id": "cand-2",
+      "ts": "2026-08-13T11:16:42.549475Z",
+      "data": {}
+    },
+    {
+      "event_id": "llm-71968",
+      "type": "llm_call",
+      "stage": "code_review",
+      "status": "done",
+      "message": "",
+      "candidate_id": null,
+      "ts": "2026-08-13T11:17:04.962165Z",
+      "data": {
+        "role": "code_reviewer",
+        "schema": "CodeReviewOutput",
+        "provider": "deepseek",
+        "model": "deepseek-v4-flash",
+        "attempts": 2,
+        "latency_ms": 0,
+        "cost_usd": 0.004248,
+        "ok": true,
+        "summary": {
+          "verdict": "APPROVE"
+        },
+        "error": null
+      }
+    },
+    {
+      "event_id": "stage-20",
+      "type": "stage",
+      "stage": "code_review",
+      "status": "done",
+      "message": "심사: APPROVE",
+      "candidate_id": "cand-2",
+      "ts": "2026-08-13T11:17:04.962165Z",
+      "data": {}
+    },
+    {
+      "event_id": "stage-21",
+      "type": "stage",
+      "stage": "sandbox",
+      "status": "started",
+      "message": "샌드박스 검증 실행",
+      "candidate_id": "cand-2",
+      "ts": "2026-08-13T11:17:04.975915Z",
+      "data": {}
+    },
+    {
+      "event_id": "stage-22",
+      "type": "stage",
+      "stage": "sandbox",
+      "status": "done",
+      "message": "검증: PASS",
+      "candidate_id": "cand-2",
+      "ts": "2026-08-13T11:17:06.407040Z",
+      "data": {}
+    },
+    {
+      "event_id": "stage-23",
+      "type": "stage",
+      "stage": "blind",
+      "status": "started",
+      "message": "블라인드 풀이 A·B",
+      "candidate_id": "cand-2",
+      "ts": "2026-08-13T11:17:06.410795Z",
+      "data": {}
+    },
+    {
+      "event_id": "stage-24",
+      "type": "stage",
+      "stage": "blind",
+      "status": "done",
+      "message": "합의: UNRESOLVED",
+      "candidate_id": "cand-2",
+      "ts": "2026-08-13T11:17:06.427194Z",
+      "data": {}
+    },
+    {
+      "event_id": "stage-25",
+      "type": "stage",
+      "stage": "critic",
+      "status": "started",
+      "message": "품질 비평",
+      "candidate_id": "cand-2",
+      "ts": "2026-08-13T11:17:06.439177Z",
+      "data": {}
+    },
+    {
+      "event_id": "llm-77216",
+      "type": "llm_call",
+      "stage": "critic",
+      "status": "done",
+      "message": "",
+      "candidate_id": null,
+      "ts": "2026-08-13T11:17:54.453294Z",
+      "data": {
+        "role": "critic",
+        "schema": "CriticOutput",
+        "provider": "deepseek",
+        "model": "deepseek-v4-flash",
+        "attempts": 2,
+        "latency_ms": 0,
+        "cost_usd": 0.008497000000000001,
+        "ok": true,
+        "summary": {
+          "score": 8.0,
+          "recommendation": "PASS"
+        },
+        "error": null
+      }
+    },
+    {
+      "event_id": "stage-26",
+      "type": "stage",
+      "stage": "critic",
+      "status": "done",
+      "message": "점수: 8.0",
+      "candidate_id": "cand-2",
+      "ts": "2026-08-13T11:17:54.462481Z",
+      "data": {}
+    },
+    {
+      "event_id": "llm-77861",
+      "type": "llm_call",
+      "stage": "generation",
+      "status": "done",
+      "message": "",
+      "candidate_id": null,
+      "ts": "2026-08-13T11:18:02.660685Z",
+      "data": {
+        "role": "vision",
+        "schema": "VisionOutput",
+        "provider": "openai",
+        "model": "gpt-5.6-luna",
+        "attempts": 1,
+        "latency_ms": 0,
+        "cost_usd": 0.001275,
+        "ok": true,
+        "summary": {
+          "caption": "평행선 $l$, $m$과 점 $A,B,C,E,P,D$ 및 수선 관계를 나타낸 도식"
+        },
+        "error": null
+      }
+    },
+    {
+      "event_id": "stage-27",
+      "type": "stage",
+      "stage": "generation",
+      "status": "started",
+      "message": "문제 생성",
+      "candidate_id": "cand-3",
+      "ts": "2026-08-13T11:18:02.660685Z",
+      "data": {}
+    },
+    {
+      "event_id": "llm-88353",
+      "type": "llm_call",
+      "stage": "generation",
+      "status": "done",
+      "message": "",
+      "candidate_id": null,
+      "ts": "2026-08-13T11:19:24.697486Z",
+      "data": {
+        "role": "generator",
+        "schema": "GeneratorOutput",
+        "provider": "deepseek",
+        "model": "deepseek-v4-flash",
+        "attempts": 1,
+        "latency_ms": 0,
+        "cost_usd": 0.012224,
+        "ok": true,
+        "summary": {
+          "final_answer_claim": "4(√2+1)"
+        },
+        "error": null
+      }
+    },
+    {
+      "event_id": "stage-28",
+      "type": "stage",
+      "stage": "generation",
+      "status": "done",
+      "message": "생성 완료",
+      "candidate_id": "cand-3",
+      "ts": "2026-08-13T11:19:24.706756Z",
+      "data": {}
+    },
+    {
+      "event_id": "stage-29",
+      "type": "stage",
+      "stage": "code_review",
+      "status": "started",
+      "message": "검증 스크립트 심사",
+      "candidate_id": "cand-3",
+      "ts": "2026-08-13T11:19:24.719320Z",
+      "data": {}
+    },
+    {
+      "event_id": "llm-93809",
+      "type": "llm_call",
+      "stage": "code_review",
+      "status": "done",
+      "message": "",
+      "candidate_id": null,
+      "ts": "2026-08-13T11:20:15.956419Z",
+      "data": {
+        "role": "code_reviewer",
+        "schema": "CodeReviewOutput",
+        "provider": "deepseek",
+        "model": "deepseek-v4-flash",
+        "attempts": 2,
+        "latency_ms": 0,
+        "cost_usd": 0.007487,
+        "ok": true,
+        "summary": {
+          "verdict": "REVISE"
+        },
+        "error": null
+      }
+    },
+    {
+      "event_id": "stage-30",
+      "type": "stage",
+      "stage": "code_review",
+      "status": "done",
+      "message": "심사: REVISE",
+      "candidate_id": "cand-3",
+      "ts": "2026-08-13T11:20:15.961942Z",
+      "data": {}
+    },
+    {
+      "event_id": "stage-31",
+      "type": "stage",
+      "stage": "blind",
+      "status": "started",
+      "message": "블라인드 풀이 A·B",
+      "candidate_id": "cand-3",
+      "ts": "2026-08-13T11:20:15.981547Z",
+      "data": {}
+    },
+    {
+      "event_id": "stage-32",
+      "type": "stage",
+      "stage": "blind",
+      "status": "done",
+      "message": "합의: UNRESOLVED",
+      "candidate_id": "cand-3",
+      "ts": "2026-08-13T11:20:15.996070Z",
+      "data": {}
+    },
+    {
+      "event_id": "stage-33",
+      "type": "stage",
+      "stage": "critic",
+      "status": "started",
+      "message": "품질 비평",
+      "candidate_id": "cand-3",
+      "ts": "2026-08-13T11:20:16.014894Z",
+      "data": {}
+    },
+    {
+      "event_id": "llm-105329",
+      "type": "llm_call",
+      "stage": "critic",
+      "status": "done",
+      "message": "",
+      "candidate_id": null,
+      "ts": "2026-08-13T11:22:01.752897Z",
+      "data": {
+        "role": "critic",
+        "schema": "CriticOutput",
+        "provider": "deepseek",
+        "model": "deepseek-v4-flash",
+        "attempts": 2,
+        "latency_ms": 0,
+        "cost_usd": 0.014948,
+        "ok": true,
+        "summary": {
+          "score": 5.0,
+          "recommendation": "REVISE"
+        },
+        "error": null
+      }
+    },
+    {
+      "event_id": "stage-34",
+      "type": "stage",
+      "stage": "critic",
+      "status": "done",
+      "message": "점수: 5.0",
+      "candidate_id": "cand-3",
+      "ts": "2026-08-13T11:22:01.759004Z",
+      "data": {}
+    },
+    {
+      "event_id": "llm-105855",
+      "type": "llm_call",
+      "stage": "generation",
+      "status": "done",
+      "message": "",
+      "candidate_id": null,
+      "ts": "2026-08-13T11:22:12.592452Z",
+      "data": {
+        "role": "vision",
+        "schema": "VisionOutput",
+        "provider": "openai",
+        "model": "gpt-5.6-luna",
+        "attempts": 1,
+        "latency_ms": 0,
+        "cost_usd": 0.001363,
+        "ok": true,
+        "summary": {
+          "caption": "두 평행선 $l,m$ 사이에서 $AB\\perp l$이고, $P$는 선분 $AB$의 내부에 있으며 직선 $CP$와 $m$의 교점이 $Q$이다."
+        },
+        "error": null
+      }
+    },
+    {
+      "event_id": "stage-35",
+      "type": "stage",
+      "stage": "generation",
+      "status": "started",
+      "message": "문제 생성",
+      "candidate_id": "cand-3",
+      "ts": "2026-08-13T11:22:12.609124Z",
+      "data": {}
+    },
+    {
+      "event_id": "llm-115552",
+      "type": "llm_call",
+      "stage": "generation",
+      "status": "done",
+      "message": "",
+      "candidate_id": null,
+      "ts": "2026-08-13T11:23:33.229039Z",
+      "data": {
+        "role": "generator",
+        "schema": "GeneratorOutput",
+        "provider": "deepseek",
+        "model": "deepseek-v4-flash",
+        "attempts": 1,
+        "latency_ms": 0,
+        "cost_usd": 0.011579,
+        "ok": true,
+        "summary": {
+          "final_answer_claim": "4(√2+1)"
+        },
+        "error": null
+      }
+    },
+    {
+      "event_id": "stage-36",
+      "type": "stage",
+      "stage": "generation",
+      "status": "done",
+      "message": "생성 완료",
+      "candidate_id": "cand-3",
+      "ts": "2026-08-13T11:23:33.234583Z",
+      "data": {}
+    },
+    {
+      "event_id": "stage-37",
+      "type": "stage",
+      "stage": "code_review",
+      "status": "started",
+      "message": "검증 스크립트 심사",
+      "candidate_id": "cand-3",
+      "ts": "2026-08-13T11:23:33.249085Z",
+      "data": {}
+    },
+    {
+      "event_id": "llm-122589",
+      "type": "llm_call",
+      "stage": "code_review",
+      "status": "done",
+      "message": "",
+      "candidate_id": null,
+      "ts": "2026-08-13T11:24:38.837497Z",
+      "data": {
+        "role": "code_reviewer",
+        "schema": "CodeReviewOutput",
+        "provider": "deepseek",
+        "model": "deepseek-v4-flash",
+        "attempts": 2,
+        "latency_ms": 0,
+        "cost_usd": 0.009242,
+        "ok": true,
+        "summary": {
+          "verdict": "APPROVE"
+        },
+        "error": null
+      }
+    },
+    {
+      "event_id": "stage-38",
+      "type": "stage",
+      "stage": "code_review",
+      "status": "done",
+      "message": "심사: APPROVE",
+      "candidate_id": "cand-3",
+      "ts": "2026-08-13T11:24:38.837497Z",
+      "data": {}
+    },
+    {
+      "event_id": "stage-39",
+      "type": "stage",
+      "stage": "sandbox",
+      "status": "started",
+      "message": "샌드박스 검증 실행",
+      "candidate_id": "cand-3",
+      "ts": "2026-08-13T11:24:38.853520Z",
+      "data": {}
+    },
+    {
+      "event_id": "stage-40",
+      "type": "stage",
+      "stage": "sandbox",
+      "status": "done",
+      "message": "검증: PASS",
+      "candidate_id": "cand-3",
+      "ts": "2026-08-13T11:24:40.410603Z",
+      "data": {}
+    },
+    {
+      "event_id": "stage-41",
+      "type": "stage",
+      "stage": "blind",
+      "status": "started",
+      "message": "블라인드 풀이 A·B",
+      "candidate_id": "cand-3",
+      "ts": "2026-08-13T11:24:40.412713Z",
+      "data": {}
+    },
+    {
+      "event_id": "stage-42",
+      "type": "stage",
+      "stage": "blind",
+      "status": "done",
+      "message": "합의: UNRESOLVED",
+      "candidate_id": "cand-3",
+      "ts": "2026-08-13T11:24:40.426244Z",
+      "data": {}
+    },
+    {
+      "event_id": "stage-43",
+      "type": "stage",
+      "stage": "critic",
+      "status": "started",
+      "message": "품질 비평",
+      "candidate_id": "cand-3",
+      "ts": "2026-08-13T11:24:40.438430Z",
+      "data": {}
+    },
+    {
+      "event_id": "llm-133316",
+      "type": "llm_call",
+      "stage": "critic",
+      "status": "done",
+      "message": "",
+      "candidate_id": null,
+      "ts": "2026-08-13T11:26:22.670958Z",
+      "data": {
+        "role": "critic",
+        "schema": "CriticOutput",
+        "provider": "deepseek",
+        "model": "deepseek-v4-flash",
+        "attempts": 2,
+        "latency_ms": 0,
+        "cost_usd": 0.014009,
+        "ok": true,
+        "summary": {
+          "score": 5.5,
+          "recommendation": "REVISE"
+        },
+        "error": null
+      }
+    },
+    {
+      "event_id": "stage-44",
+      "type": "stage",
+      "stage": "critic",
+      "status": "done",
+      "message": "점수: 5.5",
+      "candidate_id": "cand-3",
+      "ts": "2026-08-13T11:26:22.670958Z",
+      "data": {}
+    },
+    {
+      "event_id": "llm-133946",
+      "type": "llm_call",
+      "stage": "generation",
+      "status": "done",
+      "message": "",
+      "candidate_id": null,
+      "ts": "2026-08-13T11:26:36.072599Z",
+      "data": {
+        "role": "vision",
+        "schema": "VisionOutput",
+        "provider": "openai",
+        "model": "gpt-5.6-luna",
+        "attempts": 1,
+        "latency_ms": 0,
+        "cost_usd": 0.001934,
+        "ok": true,
+        "summary": {
+          "caption": "평행선 $l,m$, 수직선분 $AB$, 선분 $AB$ 위의 점 $P$, 직선 $CP$와 $m$의 교점 $Q$, 그리고 삼각형 $CAP$와 $BQP$"
+        },
+        "error": null
+      }
+    },
+    {
+      "event_id": "stage-45",
+      "type": "stage",
+      "stage": "judge",
+      "status": "started",
+      "message": "최종 랭킹 집계",
+      "candidate_id": null,
+      "ts": "2026-08-13T11:26:36.085602Z",
+      "data": {}
+    },
+    {
+      "event_id": "llm-134374",
+      "type": "llm_call",
+      "stage": "judge",
+      "status": "done",
+      "message": "",
+      "candidate_id": null,
+      "ts": "2026-08-13T11:26:40.244951Z",
+      "data": {
+        "role": "judge",
+        "schema": "JudgeOutput",
+        "provider": "deepseek",
+        "model": "deepseek-v4-flash",
+        "attempts": 1,
+        "latency_ms": 0,
+        "cost_usd": 0.001365,
+        "ok": true,
+        "summary": {
+          "ranking": [
+            {
+              "candidate_id": "cand-2",
+              "score": 8.5,
+              "reason": "Test PASS, blind consensus unresolved, highest critic score (8.0), code review approve, single attempt."
+            },
+            {
+              "candidate_id": "cand-1",
+              "score": 7.5,
+              "reason": "Test PASS, blind consensus unresolved, critic score 7.0, code review approve, single attempt."
+            },
+            {
+              "candidate_id": "cand-3",
+              "score": 6.0,
+              "reason": "Test PASS, blind consensus unresolved, lowest critic score (5.5), code review approve, required 2 attempts."
+            }
+          ]
+        },
+        "error": null
+      }
+    },
+    {
+      "event_id": "stage-46",
+      "type": "stage",
+      "stage": "judge",
+      "status": "done",
+      "message": "집계 완료",
+      "candidate_id": null,
+      "ts": "2026-08-13T11:26:40.247949Z",
+      "data": {}
+    },
+    {
+      "event_id": "stage-47",
+      "type": "stage",
+      "stage": "done",
+      "status": "done",
+      "message": "완료 — 후보 3건",
+      "candidate_id": null,
+      "ts": "2026-08-13T11:26:40.264600Z",
+      "data": {}
+    }
+  ],
+  "error": null,
+  "report": {
+    "run_id": "run-01db765e",
+    "candidates": 3
+  },
+  "created_at": "2026-08-13T11:08:52.127735Z",
+  "updated_at": "2026-08-13T11:26:40.294710Z"
+}

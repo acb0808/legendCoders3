@@ -1,0 +1,151 @@
+{
+  "job_id": "run-4456b0a5",
+  "run_id": "run-4456b0a5",
+  "source": {
+    "mode": "text",
+    "text": "? A(5, 5), B(4, -3)? ??. ?? y=2x ?? ? P? ?? y=-2x ?? ? Q? ?? ??? APQB? ??? ??? ???? ????. (?, ? P, Q? x??? ????.)",
+    "label": ""
+  },
+  "options": {
+    "difficulty_target": "??",
+    "ideator_count": 2,
+    "max_refine": 1
+  },
+  "status": "failed",
+  "events": [
+    {
+      "event_id": "stage-1",
+      "type": "stage",
+      "stage": "planner",
+      "status": "started",
+      "message": "원문을 분석하여 변형 전략을 수립한다",
+      "candidate_id": null,
+      "ts": "2026-08-12T23:10:35.892524Z",
+      "data": {}
+    },
+    {
+      "event_id": "llm-1",
+      "type": "llm_call",
+      "stage": "planner",
+      "status": "done",
+      "message": "",
+      "candidate_id": null,
+      "ts": "2026-08-12T23:11:40.918631Z",
+      "data": {
+        "role": "planner",
+        "schema": "PlannerOutput",
+        "provider": "deepseek",
+        "model": "deepseek-v4-flash",
+        "temperature": 0.2,
+        "attempts": 2,
+        "latency_ms": 0,
+        "cost_usd": 0.008546,
+        "ok": true,
+        "summary": {
+          "core_concepts": [
+            "대칭을 이용한 최단 거리"
+          ],
+          "domain": "도형의 방정식",
+          "objective": "사각형 APQB의 둘레의 길이의 최솟값을 구하시오"
+        },
+        "error": null
+      }
+    },
+    {
+      "event_id": "stage-2",
+      "type": "stage",
+      "stage": "planner",
+      "status": "done",
+      "message": "변형 스펙·전략 수립 완료",
+      "candidate_id": null,
+      "ts": "2026-08-12T23:11:40.918631Z",
+      "data": {}
+    },
+    {
+      "event_id": "stage-3",
+      "type": "stage",
+      "stage": "ideation",
+      "status": "started",
+      "message": "변형 아이디어 2개 발상",
+      "candidate_id": null,
+      "ts": "2026-08-12T23:11:40.941088Z",
+      "data": {}
+    },
+    {
+      "event_id": "llm-2",
+      "type": "llm_call",
+      "stage": "ideation",
+      "status": "failed",
+      "message": "",
+      "candidate_id": null,
+      "ts": "2026-08-12T23:14:34.225607Z",
+      "data": {
+        "role": "ideator",
+        "schema": "IdeationOutput",
+        "provider": "deepseek",
+        "model": "deepseek-v4-flash",
+        "temperature": 1.4,
+        "attempts": 5,
+        "latency_ms": 0,
+        "cost_usd": 0.021414,
+        "ok": false,
+        "summary": {},
+        "error": {
+          "code": "TRUNCATED_JSON",
+          "message": "잘린 JSON 또는 잘못된 JSON",
+          "detail": "JSON 파싱 실패: Unterminated string starting at: line 4 column 3 (char 65)",
+          "provider": "deepseek",
+          "attempt": 5
+        }
+      }
+    },
+    {
+      "event_id": "llm-3",
+      "type": "llm_call",
+      "stage": "ideation",
+      "status": "done",
+      "message": "",
+      "candidate_id": null,
+      "ts": "2026-08-12T23:14:59.600762Z",
+      "data": {
+        "role": "ideator",
+        "schema": "IdeationOutput",
+        "provider": "deepseek",
+        "model": "deepseek-v4-flash",
+        "temperature": 1.4,
+        "attempts": 5,
+        "latency_ms": 0,
+        "cost_usd": 0.02369,
+        "ok": true,
+        "summary": {
+          "idea_id": "idea-0",
+          "title": "최솟값을 이용한 미지의 직선 결정",
+          "changed_dimensions": [
+            "objective",
+            "condition_topology",
+            "solution_route",
+            "data_domain"
+          ]
+        },
+        "error": null
+      }
+    },
+    {
+      "event_id": "stage-4",
+      "type": "stage",
+      "stage": "done",
+      "status": "failed",
+      "message": "실행 실패: MathVariantError",
+      "candidate_id": null,
+      "ts": "2026-08-12T23:14:59.602756Z",
+      "data": {}
+    }
+  ],
+  "error": {
+    "message": "에이전트(ideator)가 구조화된 응답을 생성하지 못했다",
+    "code": "AGENT_UNRESOLVED"
+  },
+  "report": null,
+  "created_at": "2026-08-12T23:10:35.768738Z",
+  "updated_at": "2026-08-12T23:14:59.626851Z"
+}
