@@ -92,6 +92,7 @@ class RunStore:
         return {
             "run_id": data.get("run_id", run_id),
             "state": data.get("state", "UNKNOWN"),
+            "source": data.get("source"),
             "candidates": visible,
             "created_at": data.get("created_at"),
             "updated_at": data.get("updated_at"),

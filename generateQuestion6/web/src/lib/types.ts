@@ -74,9 +74,16 @@ export interface RunDecisionEvent {
   decided_at: string;
 }
 
+export interface RunSource {
+  mode: "text" | "problem";
+  text: string;
+  label?: string;
+}
+
 export interface GenerationRun {
   run_id: string;
   state: string;
+  source?: RunSource | null;
   candidates: Candidate[];
   created_at: string;
   updated_at: string;

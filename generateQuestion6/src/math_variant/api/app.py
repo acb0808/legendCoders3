@@ -173,6 +173,11 @@ class PipelineRunner:
         else:
             run_data = report_to_run_store(report)
             run_data["run_id"] = job_id
+            try:
+                job = self.jobs.load(job_id)
+                run_data["source"] = job.source
+            except ValueError:
+                pass
             self.store.save_run(job_id, run_data)
             self.jobs.complete(job_id, {"run_id": job_id, "candidates": len(report.candidates)})
         finally:
@@ -247,9 +252,17 @@ def list_runs() -> list[dict[str, Any]]:
 @app.get("/api/runs/{run_id}")
 def get_run(run_id: str) -> dict[str, Any]:
     try:
-        return _default_store().public_run(run_id)
+        data = _default_store().public_run(run_id)
     except RunNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    # 옛 실행(run 데이터에 source 가 없던 시기)은 생성 작업에서 원문을 보충한다.
+    if not data.get("source"):
+        try:
+            job = _default_jobs().load(run_id)
+            data["source"] = job.source
+        except ValueError:
+            pass
+    return data
 
 
 @app.post("/api/runs/{run_id}/candidates/{candidate_id}/decision")

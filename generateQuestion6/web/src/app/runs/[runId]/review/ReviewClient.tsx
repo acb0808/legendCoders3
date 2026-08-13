@@ -59,6 +59,13 @@ export function ReviewClient({ runIdPromise }: { runIdPromise: Promise<{ runId: 
           실행 <code>{run.run_id}</code> · 검증을 통과한 후보만 노출
         </p>
       </header>
+      {run.source?.text ? (
+        <section className="review-source" data-testid="review-source">
+          <h2>원본 문항</h2>
+          {run.source.label && <p className="review-source-label">{run.source.label}</p>}
+          <pre>{run.source.text}</pre>
+        </section>
+      ) : null}
       <CandidateList
         candidates={run.candidates}
         onDecide={handleDecide}
