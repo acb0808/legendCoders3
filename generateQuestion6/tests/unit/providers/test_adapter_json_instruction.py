@@ -75,3 +75,50 @@ def test_user_prompt_without_json_still_meets_requirement() -> None:
     messages = transport.request_body["messages"]
     joined = " ".join(m.get("content", "") for m in messages).lower()
     assert "json" in joined
+
+
+def test_temperature_omitted_for_flaky_flash() -> None:
+    """deepseek-v4-flash 는 temperature 를 보내면 빈 응답이 잦다.
+
+    실측: temp=0.7 에서 2/4, temp 제거 시 0/4 빈 응답. 온도를 아예 보내지 않는다.
+    """
+    transport = _RecordingTransport()
+    provider = _provider(transport)
+
+    provider.complete(
+        "문제를 생성해라.",
+        ModelPolicy(provider="deepseek", model="deepseek-chat", temperature=0.7),
+    )
+
+    assert transport.request_body is not None
+    assert "temperature" not in transport.request_body
+
+
+def test_max_tokens_param_by_provider() -> None:
+    """luna 는 max_completion_tokens, deepseek 는 max_tokens 를 사용한다."""
+    from math_variant.providers.secondary_adapter import DeepSeekProvider
+
+    # deepseek
+    transport_ds = _RecordingTransport()
+    ds = DeepSeekProvider(
+        api_key="test-key",
+        base_url="https://api.deepseek.com/v1",
+        client=httpx.Client(transport=transport_ds),
+    )
+    ds.complete("문제", ModelPolicy(provider="deepseek", model="deepseek-chat"))
+    assert transport_ds.request_body is not None
+    assert "max_tokens" in transport_ds.request_body
+    assert "max_completion_tokens" not in transport_ds.request_body
+
+    # luna (openai 계열)
+    transport_luna = _RecordingTransport()
+    luna = OpenAICompatibleProvider(
+        name="openai",
+        api_key="test-key",
+        base_url="https://api.openai.com/v1",
+        client=httpx.Client(transport=transport_luna),
+    )
+    luna.complete("문제", ModelPolicy(provider="openai", model="gpt-5.6-luna"))
+    assert transport_luna.request_body is not None
+    assert "max_completion_tokens" in transport_luna.request_body
+    assert "max_tokens" not in transport_luna.request_body
