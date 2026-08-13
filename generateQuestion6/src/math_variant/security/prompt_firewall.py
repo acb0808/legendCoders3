@@ -15,13 +15,24 @@ class ForbiddenContentScanner:
     def __init__(self, forbidden: dict[str, str]) -> None:
         self._labels = [re.escape(label) for label in forbidden]
         self._values = [re.escape(value) for value in forbidden.values() if value]
-        self._pattern = re.compile("|".join([*self._labels, *self._values]), re.IGNORECASE)
+        self._has_pattern = bool(self._labels or self._values)
+        # 빈 정규식(re.compile('')) 은 모든 텍스트에 매칭되므로,
+        # 금지 항목이 없으면 패턴 자체를 만들지 않는다. (웹 파이프라인은 빈 dict 를 넘긴다)
+        self._pattern = (
+            re.compile("|".join([*self._labels, *self._values]), re.IGNORECASE)
+            if self._has_pattern
+            else None
+        )
 
     def scan(self, text: str) -> bool:
         """금지 콘텐츠가 하나라도 있으면 True."""
+        if self._pattern is None:
+            return False
         return self._pattern.search(text) is not None
 
     def matches(self, text: str) -> list[str]:
+        if self._pattern is None:
+            return []
         return list(dict.fromkeys(self._pattern.findall(text)))
 
 
