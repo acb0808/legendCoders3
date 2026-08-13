@@ -21,7 +21,6 @@ class ModelPolicy(BaseModel):
 
     provider: str
     model: str
-    temperature: float = Field(default=0.2, ge=0, le=2)
     max_tokens: int = Field(default=4096, ge=1)
 
 

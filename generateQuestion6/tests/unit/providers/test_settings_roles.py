@@ -8,30 +8,33 @@ from math_variant.errors import MathVariantError
 from math_variant.providers.contracts import RolePolicy
 from math_variant.providers.settings import ProviderSettings
 
-EXPECTED_DEFAULT_TEMPERATURES = {
-    RolePolicy.SOURCE_ANALYZER: 0.2,
-    RolePolicy.GENERATOR: 0.7,
-    RolePolicy.BLIND_SOLVER: 0.2,
-    RolePolicy.CRITIC: 0.2,
-    RolePolicy.PLANNER: 0.2,
-    RolePolicy.IDEATOR: 0.9,  # deepseek-v4-flash 는 1.4 에서 빈 응답이 잦아 0.9 로 조정
-    RolePolicy.SELECTOR: 0.3,
-    RolePolicy.CODE_REVIEWER: 0.2,
-    RolePolicy.JUDGE: 0.2,
-    RolePolicy.VISION: 0.4,
+TEXT_ROLES = {
+    RolePolicy.SOURCE_ANALYZER,
+    RolePolicy.GENERATOR,
+    RolePolicy.BLIND_SOLVER,
+    RolePolicy.CRITIC,
+    RolePolicy.PLANNER,
+    RolePolicy.IDEATOR,
+    RolePolicy.SELECTOR,
+    RolePolicy.CODE_REVIEWER,
+    RolePolicy.JUDGE,
 }
 
 
-def test_default_roles_include_new_agents_with_high_ideator_temperature() -> None:
+def test_text_roles_default_to_deepseek_flash() -> None:
     roles = ProviderSettings(_env_file=None).role_policy().roles
-    assert roles[RolePolicy.PLANNER].provider == "deepseek"
-    # deepseek-v4-flash 는 1.4 에서 json_object 빈 응답이 잦아 0.9 로 조정했다
-    assert roles[RolePolicy.IDEATOR].temperature == 0.9
-    assert roles[RolePolicy.IDEATOR].temperature > 0.5
-    assert roles[RolePolicy.SELECTOR].temperature == 0.3
-    assert roles[RolePolicy.CODE_REVIEWER].temperature == 0.2
-    assert roles[RolePolicy.JUDGE].temperature == 0.2
-    assert roles[RolePolicy.GENERATOR].temperature == 0.7
+    for role in TEXT_ROLES:
+        assert roles[role].provider == "deepseek"
+        assert roles[role].model == "deepseek-v4-flash"  # deepseek_model_flash 기본값
+
+
+def test_roles_have_no_temperature() -> None:
+    """온도는 사용하지 않는다 — deepseek-v4-flash 는 온도를 보내면 빈 응답이 잦고,
+    gpt-5.6-luna 는 온도를 지원하지 않는다."""
+    roles = ProviderSettings(_env_file=None).role_policy().roles
+    assert len(roles) == len(RolePolicy)
+    for role in roles:
+        assert not hasattr(roles[role], "temperature")
 
 
 def test_vision_role_uses_luna_provider() -> None:
@@ -41,44 +44,20 @@ def test_vision_role_uses_luna_provider() -> None:
     assert vision.model == "gpt-5.6-luna"
 
 
-def test_text_roles_default_to_deepseek_flash_model() -> None:
-    roles = ProviderSettings(_env_file=None).role_policy().roles
-    for role in (
-        RolePolicy.PLANNER,
-        RolePolicy.IDEATOR,
-        RolePolicy.SELECTOR,
-        RolePolicy.CODE_REVIEWER,
-        RolePolicy.JUDGE,
-    ):
-        assert roles[role].model == "deepseek-chat"  # deepseek_model_flash 기본값
-
-
-def test_all_roles_have_expected_default_temperatures() -> None:
-    roles = ProviderSettings(_env_file=None).role_policy().roles
-    assert len(roles) == len(RolePolicy)
-    for role, temperature in EXPECTED_DEFAULT_TEMPERATURES.items():
-        assert roles[role].temperature == temperature
-
-
 def test_role_policy_json_override_for_new_role() -> None:
     settings = ProviderSettings(
         _env_file=None,
-        role_policy_json=(
-            '{"ideator": {"provider": "openai", "model": "gpt-5.6-luna", "temperature": 1.6}}'
-        ),
+        role_policy_json='{"ideator": {"provider": "openai", "model": "gpt-5.6-luna"}}',
     )
     entry = settings.role_policy().roles[RolePolicy.IDEATOR]
     assert entry.provider == "openai"
     assert entry.model == "gpt-5.6-luna"
-    assert entry.temperature == 1.6
 
 
 def test_json_override_merges_over_defaults() -> None:
     settings = ProviderSettings(
         _env_file=None,
-        role_policy_json=(
-            '{"ideator": {"provider": "openai", "model": "gpt-5.6-luna", "temperature": 1.6}}'
-        ),
+        role_policy_json='{"ideator": {"provider": "openai", "model": "gpt-5.6-luna"}}',
     )
     roles = settings.role_policy().roles
     assert roles[RolePolicy.SOURCE_ANALYZER].provider == "deepseek"

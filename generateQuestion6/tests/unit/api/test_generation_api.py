@@ -48,7 +48,6 @@ class _FakeRunner:
                     "schema": "PlannerOutput",
                     "provider": "fake",
                     "model": "m",
-                    "temperature": 0.2,
                     "attempts": 1,
                     "latency_ms": 5,
                     "cost_usd": 0.0,

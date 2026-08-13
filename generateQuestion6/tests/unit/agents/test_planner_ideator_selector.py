@@ -85,7 +85,7 @@ def test_planner_engine_failure_raises() -> None:
     assert exc_info.value.code == "AGENT_UNRESOLVED"
 
 
-def test_ideator_uses_high_temperature_role_and_never_sees_original() -> None:
+def test_ideator_never_sees_original() -> None:
     engine = _Engine(_IDEA, {"ideator"})
     agent = IdeatorAgent(engine=engine, prompt_bundle="발상 프롬프트")
     brief = build_ideation_brief(

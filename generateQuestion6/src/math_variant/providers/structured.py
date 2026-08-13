@@ -274,7 +274,6 @@ class StructuredOutputEngine:
                 or (error.provider if error else None)
                 or policy.provider,
                 "model": policy.model,
-                "temperature": policy.temperature,
                 "attempts": attempts,
                 "latency_ms": latency,
                 "cost_usd": cost,

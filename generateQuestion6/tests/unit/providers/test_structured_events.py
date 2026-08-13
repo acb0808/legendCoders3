@@ -147,7 +147,6 @@ class _FakeResolver:
             {
                 "provider": "fake",
                 "model": "fake-model",
-                "temperature": 0.2,
                 "max_tokens": 100,
             },
         )()

@@ -258,7 +258,7 @@ def test_ct5_role_policy_change_via_config_only() -> None:
         roles={RolePolicy.SOURCE_ANALYZER: {"provider": "openai", "model": "gpt-5-mini"}}
     )
     config_b = RolePolicyConfig(
-        roles={RolePolicy.SOURCE_ANALYZER: {"provider": "deepseek", "model": "deepseek-chat"}}
+        roles={RolePolicy.SOURCE_ANALYZER: {"provider": "deepseek", "model": "deepseek-v4-flash"}}
     )
 
     def resolve_engine(config: RolePolicyConfig) -> StructuredOutputEngine:

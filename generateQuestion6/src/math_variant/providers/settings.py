@@ -13,25 +13,26 @@ from math_variant.providers.resolver import RolePolicyConfig, RolePolicyEntry
 
 
 def _default_roles(flash_model: str) -> dict[RolePolicy, RolePolicyEntry]:
-    """역할 기본 정책을 반환한다. 텍스트 역할은 flash 모델, 비전 역할은 luna 모델."""
+    """역할 기본 정책을 반환한다. 텍스트 역할은 flash 모델, 비전 역할은 luna 모델.
+
+    temperature 는 사용하지 않는다 — deepseek-v4-flash 는 temperature 를 보내면 빈 응답이
+    잦고, gpt-5.6-luna 는 temperature 를 지원하지 않는다. 공급자 어댑터가 온도를 생략한다.
+    """
     text_roles = {
-        RolePolicy.SOURCE_ANALYZER: 0.2,
-        RolePolicy.GENERATOR: 0.7,
-        RolePolicy.BLIND_SOLVER: 0.2,
-        RolePolicy.CRITIC: 0.2,
-        RolePolicy.PLANNER: 0.2,
-        RolePolicy.IDEATOR: 0.9,
-        RolePolicy.SELECTOR: 0.3,
-        RolePolicy.CODE_REVIEWER: 0.2,
-        RolePolicy.JUDGE: 0.2,
+        RolePolicy.SOURCE_ANALYZER,
+        RolePolicy.GENERATOR,
+        RolePolicy.BLIND_SOLVER,
+        RolePolicy.CRITIC,
+        RolePolicy.PLANNER,
+        RolePolicy.IDEATOR,
+        RolePolicy.SELECTOR,
+        RolePolicy.CODE_REVIEWER,
+        RolePolicy.JUDGE,
     }
     roles: dict[RolePolicy, RolePolicyEntry] = {
-        role: RolePolicyEntry(provider="deepseek", model=flash_model, temperature=temperature)
-        for role, temperature in text_roles.items()
+        role: RolePolicyEntry(provider="deepseek", model=flash_model) for role in text_roles
     }
-    roles[RolePolicy.VISION] = RolePolicyEntry(
-        provider="openai", model="gpt-5.6-luna", temperature=0.4
-    )
+    roles[RolePolicy.VISION] = RolePolicyEntry(provider="openai", model="gpt-5.6-luna")
     return roles
 
 
@@ -45,8 +46,7 @@ class ProviderSettings(BaseSettings):
 
     deepseek_api_key: str = Field(default="")
     deepseek_base_url: str = Field(default="https://api.deepseek.com/v1")
-    deepseek_model_flash: str = Field(default="deepseek-chat")
-    deepseek_model_pro: str = Field(default="deepseek-reasoner")
+    deepseek_model_flash: str = Field(default="deepseek-v4-flash")
 
     # 역할 정책 재정의: JSON {"source_analyzer": {"provider": "...", "model": "..."}}
     role_policy_json: str = Field(default="")

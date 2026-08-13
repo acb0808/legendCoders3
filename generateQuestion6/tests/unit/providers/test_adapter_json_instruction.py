@@ -50,7 +50,7 @@ def test_json_instruction_injected_as_system_message() -> None:
 
     provider.complete(
         "문제를 변형해라.",
-        ModelPolicy(provider="deepseek", model="deepseek-chat", temperature=0.2),
+        ModelPolicy(provider="deepseek", model="deepseek-v4-flash"),
     )
 
     assert transport.request_body is not None
@@ -68,7 +68,7 @@ def test_user_prompt_without_json_still_meets_requirement() -> None:
 
     provider.complete(
         "JSON이 전혀 없는 한글 프롬프트",
-        ModelPolicy(provider="deepseek", model="deepseek-chat", temperature=0.3),
+        ModelPolicy(provider="deepseek", model="deepseek-v4-flash"),
     )
 
     assert transport.request_body is not None
@@ -87,7 +87,7 @@ def test_temperature_omitted_for_flaky_flash() -> None:
 
     provider.complete(
         "문제를 생성해라.",
-        ModelPolicy(provider="deepseek", model="deepseek-chat", temperature=0.7),
+        ModelPolicy(provider="deepseek", model="deepseek-v4-flash"),
     )
 
     assert transport.request_body is not None
@@ -105,7 +105,7 @@ def test_max_tokens_param_by_provider() -> None:
         base_url="https://api.deepseek.com/v1",
         client=httpx.Client(transport=transport_ds),
     )
-    ds.complete("문제", ModelPolicy(provider="deepseek", model="deepseek-chat"))
+    ds.complete("문제", ModelPolicy(provider="deepseek", model="deepseek-v4-flash"))
     assert transport_ds.request_body is not None
     assert "max_tokens" in transport_ds.request_body
     assert "max_completion_tokens" not in transport_ds.request_body

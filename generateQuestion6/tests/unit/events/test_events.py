@@ -41,7 +41,6 @@ def test_llm_call_event_roundtrip() -> None:
             "schema": "IdeationOutput",
             "provider": "deepseek",
             "model": "deepseek-v4-flash",
-            "temperature": 1.4,
             "attempts": 1,
             "latency_ms": 4231,
             "cost_usd": 0.0021,
