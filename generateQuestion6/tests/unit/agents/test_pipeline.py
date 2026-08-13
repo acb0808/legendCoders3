@@ -337,6 +337,49 @@ def test_pipeline_fails_when_all_ideators_fail(tmp_path) -> None:
         raise AssertionError("발상 전부 실패 시 예외가 발생해야 한다")
 
 
+def test_pipeline_continues_when_one_candidate_generation_fails(tmp_path) -> None:
+    """후보 생성·검증 중 하나만 실패해도 성공한 후보로 진행한다 (생성도 선택적)."""
+    engine = _Engine(
+        {
+            "planner": [_PLANNER],
+            "ideator": [_IDEAS[0], _IDEAS[1]],
+            "selector": [{"adopted_ideas": ["idea-1", "idea-2"], "rationale": "부합"}],
+            # generator 큐에 1개만 두면 cand-2 의 generate 는 ok=False 로 실패한다
+            "generator": [_CANDIDATE],
+            "code_reviewer": [_REVIEW_OK],
+            "critic": [_CRITIC],
+            "judge": [_JUDGE],
+        }
+    )
+    report = _pipeline(engine, tmp_path).run("원문")
+    assert len(report.candidates) == 1
+    assert report.candidates[0].candidate.candidate_id == "cand-1"
+    assert report.candidates[0].status == "PASS"
+
+
+def test_pipeline_fails_when_all_candidates_fail(tmp_path) -> None:
+    """모든 후보 생성·검증이 실패하면 AGENT_UNRESOLVED 로 실패한다."""
+    from math_variant.errors import MathVariantError
+
+    engine = _Engine(
+        {
+            "planner": [_PLANNER],
+            "ideator": [_IDEAS[0]],
+            "selector": [{"adopted_ideas": ["idea-1"], "rationale": "부합"}],
+            "generator": [],  # 전부 실패
+            "code_reviewer": [],
+            "critic": [],
+            "judge": [],
+        }
+    )
+    try:
+        _pipeline(engine, tmp_path).run("원문")
+    except MathVariantError as exc:
+        assert exc.code == "AGENT_UNRESOLVED"
+    else:
+        raise AssertionError("후보 전부 실패 시 예외가 발생해야 한다")
+
+
 def test_llm_blind_solver_uses_blind_role_and_returns_solution() -> None:
     engine = _Engine(
         {

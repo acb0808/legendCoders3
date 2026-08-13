@@ -272,10 +272,27 @@ class AgentPipeline:
         verdicts: list[CandidateVerdict] = []
         for index, blueprint in enumerate(blueprints):
             candidate_id = f"cand-{index + 1}"
-            verdict = self._grow_candidate(
-                run_id, candidate_id, blueprint, ideation_brief, strategy_brief
-            )
+            # 후보 생성·검증은 선택적이다 — 하나의 실패로 전체 파이프라인이 죽지 않도록
+            # 개별 실패를 삼키고 성공한 후보로 진행한다.
+            try:
+                verdict = self._grow_candidate(
+                    run_id, candidate_id, blueprint, ideation_brief, strategy_brief
+                )
+            except Exception as exc:
+                self.logger.warning(
+                    "candidate_skipped",
+                    extra={"candidate": candidate_id, "error": str(exc)[:300]},
+                )
+                continue
             verdicts.append(verdict)
+        if not verdicts:
+            raise MathVariantError(
+                StructuredError(
+                    code=ErrorCode.AGENT_UNRESOLVED,
+                    message="모든 후보 생성·검증이 실패했다",
+                    context={"blueprint_count": len(blueprints)},
+                )
+            )
         return verdicts
 
     def _grow_candidate(
