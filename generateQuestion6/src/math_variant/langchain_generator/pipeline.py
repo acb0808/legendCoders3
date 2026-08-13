@@ -66,6 +66,16 @@ from math_variant.langchain_generator.settings import (
 )
 from math_variant.providers.contracts import RolePolicy
 from math_variant.providers.settings import ProviderSettings
+from math_variant.reference.models import (
+    ConditionPhrasing,
+    ExamPatternCard,
+    SolutionStyle,
+)
+from math_variant.reference.sections import (
+    generator_condition_section,
+    generator_style_section,
+    ideator_pattern_section,
+)
 from math_variant.sandbox.provider import DockerSandboxProvider, SandboxProvider
 from math_variant.services.blind_solver import BlindConsensus, BlindSolution, BlindSolver
 from math_variant.verifiers.test_runner import (
@@ -145,6 +155,7 @@ class PipelineContext:
     emit: EventEmitter
     scope_section: str = ""
     critic_scope_section: str = ""
+    reference_runnable: Runnable[dict[str, str], dict[str, Any]] | None = None
 
 
 class PipelineState(TypedDict, total=False):
@@ -157,6 +168,13 @@ class PipelineState(TypedDict, total=False):
     planner_out: PlannerOutput
     ideation_brief: str
     forbidden_structure: list[str]
+    # 참조 자산 채널
+    exam_patterns: list[ExamPatternCard]
+    condition_refs: list[ConditionPhrasing]
+    style_guide: SolutionStyle | None
+    pattern_section: str
+    condition_section: str
+    style_section: str
     # 발상 팬아웃: 병렬 분기 결과를 병합하는 리듀서 채널
     seed: int
     ideas: Annotated[list[IdeationOutput], operator.add]
@@ -211,6 +229,42 @@ def _planner_node(state: PipelineState, runtime: Runtime[PipelineContext]) -> di
     }
 
 
+def _enrich_references_node(
+    state: PipelineState, runtime: Runtime[PipelineContext]
+) -> dict[str, Any]:
+    ctx = runtime.context
+    planner_out = state.get("planner_out")
+    topics = ",".join(planner_out.core_concepts) if planner_out else ""
+    if ctx.reference_runnable is not None and topics:
+        ctx.emit.emit(
+            EventStage.PLANNER, "started", "참조 자산(출제 패턴·조건 관례·해설 가이드) 검색"
+        )
+        ref_res = ctx.reference_runnable.invoke({"topics": topics})
+        pats = ref_res.get("patterns", [])
+        conds = ref_res.get("phrasings", [])
+        style = ref_res.get("style")
+        p_sec = ideator_pattern_section(pats)
+        c_sec = generator_condition_section(conds)
+        s_sec = generator_style_section(style)
+        ctx.emit.emit(EventStage.PLANNER, "done", "참조 자산 주입 완료")
+    else:
+        pats = []
+        conds = []
+        style = None
+        p_sec = ""
+        c_sec = ""
+        s_sec = ""
+
+    return {
+        "exam_patterns": pats,
+        "condition_refs": conds,
+        "style_guide": style,
+        "pattern_section": p_sec,
+        "condition_section": c_sec,
+        "style_section": s_sec,
+    }
+
+
 def _dispatch_ideas(state: PipelineState, runtime: Runtime[PipelineContext]) -> Command[Any]:
     ctx = runtime.context
     ctx.emit.emit(EventStage.IDEATION, "started", f"변형 아이디어 {ctx.ideator_count}개 발상")
@@ -224,6 +278,7 @@ def _dispatch_ideas(state: PipelineState, runtime: Runtime[PipelineContext]) -> 
                     "seed": index,
                     "ideation_brief": state["ideation_brief"],
                     "forbidden_structure": state["forbidden_structure"],
+                    "pattern_section": state.get("pattern_section", ""),
                 },
             )
             for index in range(ctx.ideator_count)
@@ -239,6 +294,7 @@ def _ideate_node(state: PipelineState, runtime: Runtime[PipelineContext]) -> dic
             state["ideation_brief"],
             seed=str(state["seed"]),
             forbidden_structure=state["forbidden_structure"],
+            pattern_section=state.get("pattern_section", ""),
         )
     except Exception as exc:
         _LOGGER.warning("ideator_skipped", extra={"error": str(exc)[:300]})
@@ -314,6 +370,8 @@ def _generate_node(state: PipelineState, runtime: Runtime[PipelineContext]) -> d
             brief=state["ideation_brief"],
             feedback=state.get("feedback", ""),
             forbidden_structure=state["forbidden_structure"],
+            condition_section=state.get("condition_section", ""),
+            style_section=state.get("style_section", ""),
         )
     except Exception as exc:
         _LOGGER.warning(
@@ -622,8 +680,9 @@ def _build_graph() -> GraphT:
     """전체 파이프라인 노드·엣지를 조립한다 (에이전트 주입 없음)."""
     graph = StateGraph(PipelineState, context_schema=PipelineContext)
 
-    # 1) 기획 → 발상 팬아웃 → 선별
+    # 1) 기획 → 참조 자산 검색(풍부화) → 발상 팬아웃 → 선별
     graph.add_node("planner", _planner_node)
+    graph.add_node("enrich_references", _enrich_references_node)
     graph.add_node("dispatch_ideas", _dispatch_ideas)
     graph.add_node("ideate", _ideate_node)
     graph.add_node("select", _select_node)
@@ -648,7 +707,8 @@ def _build_graph() -> GraphT:
     graph.add_node("report", _report_node)
 
     graph.add_edge(START, "planner")
-    graph.add_edge("planner", "dispatch_ideas")
+    graph.add_edge("planner", "enrich_references")
+    graph.add_edge("enrich_references", "dispatch_ideas")
     graph.add_edge("ideate", "select")
     graph.add_conditional_edges(
         "select", _select_route, {"dispatch": "load_candidate", "empty": "empty"}
@@ -738,6 +798,7 @@ def build_pipeline_graph(
     on_event: Callable[[PipelineEvent], None] | None = None,
     scope_section: str = "",
     critic_scope_section: str = "",
+    reference_runnable: Runnable[dict[str, str], dict[str, Any]] | None = None,
 ) -> LangChainPipeline:
     """주입된 에이전트·검증기로 컴파일된 파이프라인을 만든다.
 
@@ -761,6 +822,7 @@ def build_pipeline_graph(
         emit=EventEmitter(on_event),
         scope_section=scope_section,
         critic_scope_section=critic_scope_section,
+        reference_runnable=reference_runnable,
     )
     return LangChainPipeline(_build_graph().compile(), context)
 
@@ -776,6 +838,7 @@ def build_langchain_pipeline(
     forbidden_context: dict[str, str] | None = None,
     scope_section: str = "",
     critic_scope_section: str = "",
+    reference_runnable: Runnable[dict[str, str], dict[str, Any]] | None = None,
 ) -> LangChainPipeline:
     """설정·역할 체인·에이전트를 묶어 LangChain 파이프라인 그래프를 구성한다.
 
@@ -857,5 +920,6 @@ def build_langchain_pipeline(
         on_event=on_event,
         scope_section=scope_section,
         critic_scope_section=critic_scope_section,
+        reference_runnable=reference_runnable,
     )
     return graph

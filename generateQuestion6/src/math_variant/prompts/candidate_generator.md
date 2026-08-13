@@ -16,6 +16,7 @@
 - 문제 본문(problem_text), 기계 형식화(formalization), 주장 답(final_answer_claim),
   풀이 단계(solution_steps), 변형 근거(transformation_evidence)를 분리해 반환한다.
 - 주장 답과 해설은 검증 전 값이므로 단정하지 않는다.
+- 조건 표현 관례 및 해설 스타일 가이드가 주어지면 해당 단원의 표준 서술 순서와 어휘를 준수하여 문제와 해설을 작성한다.
 
 ## 출력 스키마 (JSON — 반드시 아래 타입과 형태를 지킨다)
 

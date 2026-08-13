@@ -9,7 +9,9 @@ from __future__ import annotations
 import os
 from collections.abc import Callable
 from pathlib import Path
-from typing import Literal, Protocol
+from typing import Any, Literal, Protocol
+
+from langchain_core.runnables import Runnable
 
 from math_variant.agents.blind import LLMBlindSolver
 from math_variant.agents.code_reviewer import CodeReviewAgent
@@ -28,17 +30,24 @@ from math_variant.providers.registry import SchemaRegistry
 from math_variant.providers.resolver import RoleResolver
 from math_variant.providers.settings import ProviderSettings
 from math_variant.providers.structured import StructuredOutputEngine
+from math_variant.reference.condition_retriever import ConditionStyleRetriever
 from math_variant.reference.curriculum import build_scope
+from math_variant.reference.exam_retriever import ExamPatternRetriever
+from math_variant.reference.sections import (
+    build_reference_runnable,
+)
 from math_variant.reference.sections import (
     critic_scope_section as render_critic_scope,
 )
 from math_variant.reference.sections import (
     planner_scope_section as render_planner_scope,
 )
+from math_variant.reference.style_retriever import SolutionStyleRetriever
 from math_variant.sandbox.provider import DockerSandboxProvider
 from math_variant.services.blind_solver import BlindSolver
 
 PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
+DEFAULT_DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
 
 
 class PipelineRunnerProtocol(Protocol):
@@ -75,6 +84,25 @@ def _resolve_scope_sections(
     return resolved_scope, resolved_critic
 
 
+def _resolve_reference_runnable(
+    data_dir: Path | None = None,
+) -> Runnable[dict[str, str], dict[str, Any]] | None:
+    if os.getenv("MATH_VARIANT_REFERENCE", "on").strip().lower() == "off":
+        return None
+    d = data_dir or DEFAULT_DATA_DIR
+    exam_p = d / "reference_exam_patterns.jsonl"
+    cond_p = d / "condition_style_index.json"
+    style_p = d / "solution_style_guide.json"
+    if not (exam_p.exists() or cond_p.exists() or style_p.exists()):
+        return None
+
+    return build_reference_runnable(
+        ExamPatternRetriever(index_path=exam_p, k=3),
+        ConditionStyleRetriever(index_path=cond_p, k=5),
+        SolutionStyleRetriever(index_path=style_p),
+    )
+
+
 def build_agent_pipeline(
     *,
     ideator_count: int = 3,
@@ -87,6 +115,7 @@ def build_agent_pipeline(
     scope_profile: str | None = None,
     scope_section: str | None = None,
     critic_scope_section: str | None = None,
+    reference_runnable: Runnable[dict[str, str], dict[str, Any]] | None = None,
 ) -> AgentPipeline:
     """기본 httpx 공급자·에이전트를 묶어 AgentPipeline 을 구성한다."""
     settings = ProviderSettings()
@@ -106,6 +135,11 @@ def build_agent_pipeline(
         scope_profile=scope_profile,
         scope_section=scope_section,
         critic_scope_section=critic_scope_section,
+    )
+    runnable = (
+        reference_runnable
+        if reference_runnable is not None
+        else _resolve_reference_runnable()
     )
 
     return AgentPipeline(
@@ -129,6 +163,7 @@ def build_agent_pipeline(
         on_event=on_event,
         scope_section=sec_planner,
         critic_scope_section=sec_critic,
+        reference_runnable=runnable,
     )
 
 
@@ -145,9 +180,16 @@ def build_pipeline(
     scope_profile: str | None = None,
     scope_section: str | None = None,
     critic_scope_section: str | None = None,
+    reference_runnable: Runnable[dict[str, str], dict[str, Any]] | None = None,
 ) -> PipelineRunnerProtocol:
     """엔진 설정(또는 MATH_VARIANT_PIPELINE_ENGINE 환경변수)에 따라 파이프라인을 생성한다."""
     chosen_engine = engine or os.getenv("MATH_VARIANT_PIPELINE_ENGINE", "default").lower()
+    runnable = (
+        reference_runnable
+        if reference_runnable is not None
+        else _resolve_reference_runnable()
+    )
+
     if chosen_engine == "langchain":
         from math_variant.langchain_generator.pipeline import build_langchain_pipeline
 
@@ -167,6 +209,7 @@ def build_pipeline(
             forbidden_context=forbidden_context,
             scope_section=sec_planner,
             critic_scope_section=sec_critic,
+            reference_runnable=runnable,
         )
 
     return build_agent_pipeline(
@@ -180,4 +223,5 @@ def build_pipeline(
         scope_profile=scope_profile,
         scope_section=scope_section,
         critic_scope_section=critic_scope_section,
+        reference_runnable=runnable,
     )

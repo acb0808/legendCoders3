@@ -24,6 +24,7 @@ from functools import partial
 from pathlib import Path
 from typing import Any, Literal, Protocol
 
+from langchain_core.runnables import Runnable
 from pydantic import BaseModel, ConfigDict, Field
 
 from math_variant.agents.code_reviewer import CodeReviewAgent
@@ -44,6 +45,11 @@ from math_variant.agents.vision_artist import VisionArtist
 from math_variant.domain.candidate import CandidateProblem
 from math_variant.errors import ErrorCode, MathVariantError, StructuredError
 from math_variant.events import EventStage, PipelineEvent
+from math_variant.reference.sections import (
+    generator_condition_section,
+    generator_style_section,
+    ideator_pattern_section,
+)
 from math_variant.sandbox.provider import SandboxProvider
 from math_variant.services.blind_solver import BlindConsensus
 from math_variant.verifiers.test_runner import (
@@ -120,6 +126,7 @@ class AgentPipeline:
         on_event: Callable[[PipelineEvent], None] | None = None,
         scope_section: str = "",
         critic_scope_section: str = "",
+        reference_runnable: Runnable[dict[str, str], dict[str, Any]] | None = None,
     ) -> None:
         self.planner = planner
         self.ideator = ideator
@@ -140,6 +147,7 @@ class AgentPipeline:
         self._event_seq = 0
         self.scope_section = scope_section
         self.critic_scope_section = critic_scope_section
+        self.reference_runnable = reference_runnable
         self.logger = logging.getLogger("math_variant.agents.pipeline")
 
     def _emit(
@@ -188,6 +196,24 @@ class AgentPipeline:
             scope_section=self.scope_section,
         )
         self._emit(EventStage.PLANNER, "done", "변형 스펙·전략 수립 완료")
+
+        p_sec = ""
+        c_sec = ""
+        s_sec = ""
+        if self.reference_runnable is not None:
+            topics = ",".join(planner_out.core_concepts)
+            if topics:
+                self._emit(
+                    EventStage.PLANNER,
+                    "started",
+                    "참조 자산(출제 패턴·조건 관례·해설 가이드) 검색",
+                )
+                ref_res = self.reference_runnable.invoke({"topics": topics})
+                p_sec = ideator_pattern_section(ref_res.get("patterns", []))
+                c_sec = generator_condition_section(ref_res.get("phrasings", []))
+                s_sec = generator_style_section(ref_res.get("style"))
+                self._emit(EventStage.PLANNER, "done", "참조 자산 주입 완료")
+
         strategy = _to_strategy_dict(planner_out.strategy)
         if not strategy_brief:
             strategy_brief = json.dumps(strategy, ensure_ascii=False)
@@ -210,6 +236,7 @@ class AgentPipeline:
                     partial(
                         self.ideator.ideate,
                         forbidden_structure=planner_out.forbidden_structure,
+                        pattern_section=p_sec,
                     ),
                     ideation_brief,
                     str(seed),
@@ -255,6 +282,8 @@ class AgentPipeline:
             strategy_brief,
             source_text=source_text,
             forbidden_structure=planner_out.forbidden_structure,
+            condition_section=c_sec,
+            style_section=s_sec,
         )
         rank_entries = [
             {
@@ -293,6 +322,8 @@ class AgentPipeline:
         strategy_brief: str,
         source_text: str = "",
         forbidden_structure: list[str] | None = None,
+        condition_section: str = "",
+        style_section: str = "",
     ) -> list[CandidateVerdict]:
         verdicts: list[CandidateVerdict] = []
         for index, blueprint in enumerate(blueprints):
@@ -308,6 +339,8 @@ class AgentPipeline:
                     strategy_brief,
                     source_text=source_text,
                     forbidden_structure=forbidden_structure,
+                    condition_section=condition_section,
+                    style_section=style_section,
                 )
             except Exception as exc:
                 self.logger.warning(
@@ -337,6 +370,8 @@ class AgentPipeline:
         forbidden_structure: list[str] | None = None,
         feedback: str = "",
         attempts: int = 1,
+        condition_section: str = "",
+        style_section: str = "",
     ) -> CandidateVerdict:
         blueprint_dict = {
             "idea_id": blueprint.idea_id,
@@ -352,6 +387,8 @@ class AgentPipeline:
             brief=ideation_brief,
             feedback=feedback,
             forbidden_structure=forbidden_structure,
+            condition_section=condition_section,
+            style_section=style_section,
         )
 
         from math_variant.services.similarity import similarity_report
@@ -387,6 +424,8 @@ class AgentPipeline:
                 forbidden_structure=forbidden_structure,
                 feedback=feedback,
                 attempts=attempts + 1,
+                condition_section=condition_section,
+                style_section=style_section,
             )
 
         self._emit(EventStage.GENERATION, "done", "생성 완료", candidate_id)
@@ -464,6 +503,8 @@ class AgentPipeline:
                 forbidden_structure=forbidden_structure,
                 feedback=feedback,
                 attempts=attempts + 1,
+                condition_section=condition_section,
+                style_section=style_section,
             )
 
         verdict = CandidateVerdict(

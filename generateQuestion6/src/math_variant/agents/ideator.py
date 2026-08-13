@@ -48,8 +48,13 @@ class IdeatorAgent:
         brief: str,
         seed: str,
         forbidden_structure: list[str] | None = None,
+        *,
+        pattern_section: str = "",
     ) -> IdeationOutput:
-        prompt = f"{self.prompt_bundle}\n\n[입력]\n{brief}"
+        prompt = f"{self.prompt_bundle}\n\n"
+        if pattern_section.strip():
+            prompt += f"{pattern_section.strip()}\n\n"
+        prompt += f"[입력]\n{brief}"
         if forbidden_structure:
             prompt += f"\n[금지 구조 (원본 구성 골격, 재사용 금지)]\n- {forbidden_structure}\n"
         data = request_structured(

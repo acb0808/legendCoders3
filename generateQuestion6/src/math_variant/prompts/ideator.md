@@ -19,6 +19,7 @@
   objective/condition_topology/condition_order/auxiliary_construction/solution_route 중
   구조를 골라 4개 이상 제시한다.
 - 단순 숫자 치환은 금지. 도형이 필요한 경우 figure_required=true 와 figure_notes 를 채운다.
+- 기출 출제 패턴 참조가 주어지면 발문 양식과 구성 방식을 참고하되, 원문 문제를 복제하지 말고 새로운 조건과 설정으로 구성한다.
 
 ## 출력 스키마 (JSON — 반드시 아래 타입을 지킨다)
 

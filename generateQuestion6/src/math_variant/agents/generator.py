@@ -26,9 +26,17 @@ class GeneratorAgent:
         brief: str,
         feedback: str = "",
         forbidden_structure: list[str] | None = None,
+        *,
+        condition_section: str = "",
+        style_section: str = "",
     ) -> tuple[CandidateProblem, GeneratorOutput]:
         self._last_prompt = self._build_prompt(
-            blueprint, brief, feedback, forbidden_structure=forbidden_structure
+            blueprint,
+            brief,
+            feedback,
+            forbidden_structure=forbidden_structure,
+            condition_section=condition_section,
+            style_section=style_section,
         )
         data = request_structured(
             self.engine,
@@ -55,9 +63,16 @@ class GeneratorAgent:
         brief: str,
         feedback: str,
         forbidden_structure: list[str] | None = None,
+        *,
+        condition_section: str = "",
+        style_section: str = "",
     ) -> str:
-        prompt = (
-            f"{self.prompt_bundle}\n\n"
+        prompt = f"{self.prompt_bundle}\n\n"
+        if condition_section.strip():
+            prompt += f"{condition_section.strip()}\n\n"
+        if style_section.strip():
+            prompt += f"{style_section.strip()}\n\n"
+        prompt += (
             f"[문제 구조]\n{brief}\n"
             f"[승인 청사진]\n"
             f"- 보존: {blueprint.get('preserved_concepts')}\n"
