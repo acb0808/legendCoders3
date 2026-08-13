@@ -25,6 +25,7 @@ _PLANNER_DATA = {
     "answer_type": "expression",
     "domain": "이차함수·도형의 이동",
     "preservation_goals": ["평행이동 성질", "교점·중점"],
+    "forbidden_structure": ["직선 위 점에서 축에 수선", "삼각형 넓이 조건"],
     "strategy": {
         "difficulty_target": "중상",
         "preservation_goals": ["평행이동 성질"],

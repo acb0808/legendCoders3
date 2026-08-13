@@ -28,6 +28,7 @@ def _planner(**overrides: object) -> dict:
         "answer_type": "expression",
         "domain": "이차함수·도형의 이동",
         "preservation_goals": ["평행이동 성질", "포물선과 직선의 교점"],
+        "forbidden_structure": ["직선 위 점에서 축에 수선", "삼각형 넓이 조건"],
         "strategy": {
             "difficulty_target": "중상",
             "preservation_goals": ["평행이동 성질"],
@@ -49,6 +50,17 @@ def test_planner_schema_parses() -> None:
 def test_planner_rejects_extra_fields() -> None:
     with pytest.raises(ValidationError):
         PlannerOutput.model_validate(_planner(injected="extra"))
+
+
+def test_planner_requires_forbidden_structure() -> None:
+    missing = _planner()
+    del missing["forbidden_structure"]
+    with pytest.raises(ValidationError):
+        PlannerOutput.model_validate(missing)
+    with pytest.raises(ValidationError):
+        PlannerOutput.model_validate(_planner(forbidden_structure=[]))
+    output = PlannerOutput.model_validate(_planner())
+    assert "직선 위 점에서 축에 수선" in output.forbidden_structure
 
 
 def test_ideation_dimension_coerces_from_string() -> None:

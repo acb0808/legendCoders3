@@ -40,6 +40,7 @@ class PlannerOutput(BaseModel):
     answer_type: str
     domain: str
     preservation_goals: list[str] = Field(min_length=1)
+    forbidden_structure: list[str] = Field(min_length=1)  # 원본 문제의 구성 골격 (재사용 금지)
     strategy: ProductionStrategy
     unresolved_assumptions: list[str] = Field(default_factory=list)
 

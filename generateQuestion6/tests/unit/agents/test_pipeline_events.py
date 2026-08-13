@@ -29,6 +29,7 @@ _PLANNER = {
     "answer_type": "expression",
     "domain": "도형의 방정식",
     "preservation_goals": ["평행이동 성질"],
+    "forbidden_structure": ["직선 위 점에서 축에 수선", "삼각형 넓이 조건"],
     "strategy": {
         "difficulty_target": "중상",
         "preservation_goals": ["평행이동"],
