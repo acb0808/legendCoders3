@@ -246,7 +246,16 @@ def health() -> dict[str, object]:
 
 @app.get("/api/runs")
 def list_runs() -> list[dict[str, Any]]:
-    return _default_store().list_runs()
+    summaries = _default_store().list_runs()
+    # 옛 실행(run 데이터에 source 가 없던 시기)은 생성 작업에서 원문을 보충한다.
+    for summary in summaries:
+        if not summary.get("source"):
+            try:
+                job = _default_jobs().load(summary["run_id"])
+                summary["source"] = job.source
+            except ValueError:
+                pass
+    return summaries
 
 
 @app.get("/api/runs/{run_id}")

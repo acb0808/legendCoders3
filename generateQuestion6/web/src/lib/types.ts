@@ -92,6 +92,7 @@ export interface GenerationRun {
 export interface RunSummary {
   run_id: string;
   state: string;
+  source?: RunSource | null;
   candidate_count: number;
   verified_count: number;
   created_at: string | null;

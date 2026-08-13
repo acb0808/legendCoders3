@@ -187,6 +187,13 @@ a {
   font-size: 0.9rem;
 }
 
+.run-time {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
+
 .runs-loading,
 .runs-empty,
 .runs-error {

@@ -48,7 +48,7 @@ class RunStore:
         return self.base_dir / f"{run_id}.json"
 
     def list_runs(self) -> list[dict[str, Any]]:
-        """생성 실행 요약 목록 (업데이트 최신순)."""
+        """생성 실행 요약 목록 (최신 생성순)."""
         summaries: list[dict[str, Any]] = []
         for path in self.base_dir.glob("*.json"):
             data = cast(dict[str, Any], json.loads(path.read_text(encoding="utf-8")))
@@ -57,6 +57,7 @@ class RunStore:
                 {
                     "run_id": data.get("run_id", path.stem),
                     "state": data.get("state", "UNKNOWN"),
+                    "source": data.get("source"),
                     "candidate_count": len(candidates),
                     "verified_count": sum(
                         1
@@ -67,7 +68,7 @@ class RunStore:
                     "updated_at": data.get("updated_at"),
                 }
             )
-        summaries.sort(key=lambda item: item.get("updated_at") or "", reverse=True)
+        summaries.sort(key=lambda item: item.get("created_at") or "", reverse=True)
         return summaries
 
     def load_run(self, run_id: str) -> dict[str, Any]:
