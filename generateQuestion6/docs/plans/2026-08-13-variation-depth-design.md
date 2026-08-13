@@ -130,12 +130,54 @@ sandbox → blind → critic → judge)는 유지하되, 각 단계가 "원본 �
   - **표현 복제 검사**: 후보 문장이 원문 문장과 겹치면 novelty 를 크게 낮춘다.
   - **구성 아이디어 동일 검사**: 후보의 객체 배치·관계·목표 형태가 forbidden_structure 와
     동일한 골격이면 novelty 를 낮추고 REVISE/REJECT 를 권한다.
+  - **구체적 수정 지시**: novelty 가 낮을 때 "이렇게 바꾸면 참신해진다"는 구체 지시를
+    `comments` 에 남기도록 한다 (자동 피드백 루프의 입력이 된다).
 - `criteria_scores.novelty` 가 낮으면 전체 score 가 낮아지도록 가중치 지침을 명시한다.
 
 ### 영향 파일
 - `src/math_variant/agents/critic.py`
 - `src/math_variant/prompts/critic.md`
 - `src/math_variant/agents/pipeline.py` (원문 전달 배선)
+
+---
+
+## 섹션 6: 참신성 피드백 루프 (파이프라인 자동 루프)
+
+기존 REVISE 루프(`_grow_candidate` 의 재귀, `max_refine` 한도)를 **참신성 관점으로 강화**한다.
+원본과 유사한 후보가 나오면 단순 폐기가 아니라 "무엇이 같고, 어떻게 바꿔야 하는지"를
+생성자에게 넘겨 다른 구성으로 재생성한다.
+
+### 유사성 판정 → 구체적 수정 지시
+
+- `services/similarity.py` 는 단순 bool 대신 **판정 보고서**를 반환한다:
+
+```
+SimilarityReport(too_similar: bool, lcs_len: int, ngram_score: float, match_snippet: str)
+```
+
+  - `match_snippet`: 원문과 후보 사이 최장 공통 부분문자열(정규화 전 원문 기준 구간).
+- 파이프라인은 `too_similar == True` 이면 REVISE 피드백으로 다음을 생성한다:
+
+  ```
+  "[피드백] 원문과 '{match_snippet}' 구간이 일치합니다.
+   같은 단원에서 이 구성과 다른 수학 아이디어로 문제를 다시 구성하세요."
+  ```
+
+### Critic novelty 낮음 → 구체 지시 피드백
+
+- `critic.recommendation == "REVISE"` 이고 novelty 가 낮으면 `critic.comments` 에 담긴
+  구체적 수정 지시를 피드백으로 생성자에 전달한다 (기존 `review.feedback or critic.comments` 경로).
+
+### 루프 한도와 폐기
+
+- 재시도 횟수는 기존 `max_refine`(기본 2) 을 따른다.
+- 한도를 초과하면 해당 후보는 폐기(UNRESOLVED)되고, 다른 발상 아이디어로 진행한다.
+- 유사성 위반이 모든 후보에서 지속되면 기존 `AGENT_UNRESOLVED` 실패 경로로 종료한다.
+
+### 검증 테스트
+- similarity_report 가 일치 구간 스니펫을 반환하는지.
+- 파이프라인에서 유사성 위반 → feedback 에 스니펫 포함 → 재생성(attempt 증가)이 일어나는지.
+- max_refine 초과 시 후보 폐기로 이어지는지.
 
 ---
 

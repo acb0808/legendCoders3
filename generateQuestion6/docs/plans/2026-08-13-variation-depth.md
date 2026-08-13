@@ -181,10 +181,11 @@ git -C .. commit -m "feat: keep generator from reusing the original problem stru
 ```python
 # tests/unit/services/test_similarity.py
 from math_variant.services.similarity import (
-    is_too_similar,
+    SimilarityReport,
     longest_common_substring,
     ngram_similarity,
     normalize_text,
+    similarity_report,
 )
 
 
@@ -210,15 +211,20 @@ def test_ngram_low_for_different_problem() -> None:
     assert ngram_similarity(a, b) < 0.3
 
 
-def test_is_too_similar_flag_and_pass() -> None:
-    assert is_too_similar(
-        "삼각형 OPH의 넓이가 9가 되도록 하는 점 P의 좌표를 모두 구하시오.",
-        "삼각형 OPH의 넓이가 9가 되도록 하는 점 P의 좌표를 모두 구하시오.",
-    )
-    assert not is_too_similar(
-        "직선 위의 점에서 축에 내린 수선과 삼각형 넓이를 이용한다.",
-        "포물선 y=ax^2와 직선 y=x+3의 두 교점 사이의 거리를 구하시오.",
-    )
+def test_report_flags_copy_with_snippet() -> None:
+    source = "직선 위의 점 P에서 x축에 내린 수선의 발을 H라 하면 삼각형 OPH의 넓이가 9이다."
+    candidate = "직선 위의 점 P에서 x축에 내린 수선의 발을 H라 하면 삼각형 OPH의 넓이가 9가 되는 P를 구하시오."
+    report = similarity_report(source, candidate)
+    assert report.too_similar is True
+    assert report.lcs_len > 20
+    assert "삼각형" in report.match_snippet or "OPH" in report.match_snippet
+
+
+def test_report_pass_for_different_problem() -> None:
+    source = "직선 위의 점에서 축에 내린 수선과 삼각형 넓이를 이용한다."
+    candidate = "포물선 y=ax^2와 직선 y=x+3의 두 교점 사이의 거리를 구하시오."
+    report = similarity_report(source, candidate)
+    assert report.too_similar is False
 ```
 
 **Step 2: 구현**
@@ -228,17 +234,19 @@ def test_is_too_similar_flag_and_pass() -> None:
 """원문 vs 후보의 결정적(비LLM) 표현 유사성 검사.
 
 표현 복제(원문 문장을 그대로 쓰는 문제)를 차단하기 위한 보조 필터다.
-아이디어 수준의 참신성은 Critic 이 담당하고, 여기서는 문자열 유사성만 결정적으로 판정한다.
+아이디어 수준의 참신성은 Critic 이 담당하고, 여기서는 문자열 유사성을 결정적으로
+판정해 "어느 구간이 일치하는지" 까지 보고한다 (피드백 루프 입력).
 """
 
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 
 _STRIP = re.compile(r"[\s\u3000，。！？·、·\.\.,:;:()\[\]{}<>\"'‘’“”=+\-*/^_\\|~`!@#$%&]")
 
-_LCS_THRESHOLD = 20          # 최장 공통 부분문자열 최대 길이 기준
-_NGRAM_THRESHOLD = 0.55      # 문자 3-gram 유사도 기준
+_LCS_THRESHOLD = 20     # 최장 공통 부분문자열 최대 길이 기준
+_NGRAM_THRESHOLD = 0.55  # 문자 3-gram 유사도 기준
 
 
 def normalize_text(text: str) -> str:
@@ -246,12 +254,14 @@ def normalize_text(text: str) -> str:
     return _STRIP.sub("", text)
 
 
-def longest_common_substring(a: str, b: str) -> int:
-    """두 문자열의 최장 공통 부분문자열 길이 (연속 부분)."""
+def longest_common_substring(a: str, b: str) -> tuple[int, int, int]:
+    """최장 공통 부분문자열 (길이, a 시작 인덱스, b 시작 인덱스)."""
     if not a or not b:
-        return 0
+        return 0, 0, 0
     prev = [0] * (len(b) + 1)
     best = 0
+    best_a = 0
+    best_b = 0
     for i in range(1, len(a) + 1):
         cur = [0] * (len(b) + 1)
         for j in range(1, len(b) + 1):
@@ -259,8 +269,10 @@ def longest_common_substring(a: str, b: str) -> int:
                 cur[j] = prev[j - 1] + 1
                 if cur[j] > best:
                     best = cur[j]
+                    best_a = i - best
+                    best_b = j - best
         prev = cur
-    return best
+    return best, best_a, best_b
 
 
 def ngram_similarity(a: str, b: str, n: int = 3) -> float:
@@ -276,27 +288,33 @@ def ngram_similarity(a: str, b: str, n: int = 3) -> float:
     return len(grams_a & grams_b) / len(grams_a | grams_b)
 
 
-def is_too_similar(source_text: str, candidate_text: str) -> bool:
-    """원문과 후보가 표현 수준에서 지나치게 닮았으면 True."""
+@dataclass(frozen=True)
+class SimilarityReport:
+    too_similar: bool
+    lcs_len: int
+    ngram_score: float
+    match_snippet: str = ""
+
+
+def similarity_report(source_text: str, candidate_text: str) -> SimilarityReport:
+    """원문과 후보의 표현 유사성을 판정한다. 일치 구간 스니펫을 포함한다."""
     src = normalize_text(source_text)
     cand = normalize_text(candidate_text)
     if not src or not cand:
-        return False
-    if longest_common_substring(src, cand) > _LCS_THRESHOLD:
-        return True
-    if ngram_similarity(src, cand) > _NGram_THRESHOLD if False else ngram_similarity(src, cand) > _NGram_THRESHOLD:
-        return True
-    return False
+        return SimilarityReport(False, 0, 0.0)
+    lcs_len, a_start, _b_start = longest_common_substring(src, cand)
+    ngram = ngram_similarity(src, cand)
+    too_similar = lcs_len > _LCS_THRESHOLD or ngram > _NGRAM_THRESHOLD
+    snippet = src[a_start : a_start + lcs_len] if too_similar else ""
+    return SimilarityReport(too_similar, lcs_len, ngram, snippet)
 ```
-
-참고: 위 마지막 조건문은 정리해서 `if ngram_similarity(src, cand) > _NGRAM_THRESHOLD:` 로 작성한다.
 
 **Step 3: 테스트 통과 확인 + 커밋**
 
 ```bash
 .venv\Scripts\python -m pytest tests/unit/services/test_similarity.py -q
 git -C .. add generateQuestion6/src/math_variant/services/similarity.py generateQuestion6/tests/unit/services/test_similarity.py
-git -C .. commit -m "feat: add deterministic lexical similarity filter"
+git -C .. commit -m "feat: add deterministic lexical similarity filter with match report"
 ```
 
 ---
@@ -365,56 +383,58 @@ git -C .. commit -m "feat: critic novelty now compares against the original prob
   - `self.generator.generate(...)` 호출에 `forbidden_structure=forbidden_structure` 전달 (Task 3).
   - `self.critic.criticize(..., source_text=source_text, forbidden_structure=forbidden_structure)` 전달 (Task 5).
 
-**Step 2: 결정적 유사성 필터 배선**
+**Step 2: 결정적 유사성 필터 배선 (구체 피드백 → REVISE 재시도)**
 
 `_grow_candidate` 에서 generator 직후, code_review 이전에:
 
 ```python
-        from math_variant.services.similarity import is_too_similar
+        from math_variant.services.similarity import similarity_report
 
-        if is_too_similar(source_text, candidate.problem_text):
-            self._emit(EventStage.GENERATION, "failed", "원문과 표현이 지나치게 유사 — 재생성", candidate_id)
-            raise SimilarityViolation("원문과 표현이 지나치게 유사하다")
+        report = similarity_report(source_text, candidate.problem_text)
+        if report.too_similar:
+            feedback = (
+                f"[참신성 피드백] 원문과 '{report.match_snippet}' 구간이 일치합니다. "
+                "같은 단원에서 이 구성과 다른 수학 아이디어로 문제를 다시 구성하세요."
+            )
+            self._emit(
+                EventStage.GENERATION, "failed",
+                f"원문과 표현이 유사 (일치 {report.lcs_len}자) — 재생성", candidate_id,
+            )
+            # REVISE 재귀(max_refine 한도)로 재생성한다
+            return self._grow_candidate(
+                run_id, candidate_id, blueprint, ideation_brief, strategy_brief,
+                source_text=source_text, forbidden_structure=forbidden_structure,
+                feedback=feedback, attempts=attempts + 1,
+            )
 ```
 
-- 유사성 위반은 `feedback` 으로 재생성될 수 있도록 예외를 만들지 말고, REVISE 흐름을 이용한다.
-  가장 간단한 방법: `is_too_similar` 가 True 이면 `self.logger.warning(...)` 후
-  `candidate_id` 단위에서 **REVISE 재시도로 연결** — 아래 Step 3 참고.
+- `_grow_candidate` 가 `attempts > self.max_refine` 인데도 유사하면 REVISE 로직처럼 재귀를 계속하지 않고
+  폐기(UNRESOLVED)한다. 즉 유사성 위반 재귀도 `attempts` 한도를 공유한다:
+  재귀 진입 전 `if attempts >= self.max_refine: status="UNRESOLVED"` 처리로 폐기.
+- Critic novelty 낮음(REVISE)은 기존 경로로 `review.feedback or "; ".join(critic.comments)` 를
+  feedback 으로 재생성한다. Task 5 의 "구체적 수정 지시" 지침 덕에 critic.comments 가
+  참신성 개선 지시를 담는다.
 
-**Step 3: 유사성 위반 → REVISE 재시도**
+**Step 3: 참신성 피드백 루프 통합 테스트 추가**
 
-- 모듈 최상단에 `class SimilarityViolation(Exception)` 정의.
-- `_grow_candidate` generator 직후 위반 시 `raise SimilarityViolation(...)`.
-- `_grow_candidate` 를 감싼 최상위 재시도 구조는 없으므로, REVISE 로직에 통합한다:
+`tests/unit/agents/test_pipeline_revision.py` (신규):
 
 ```python
-        if is_too_similar(source_text, candidate.problem_text):
-            status = "REVISE"
-        else:
-            ... 기존 review/sandbox/blind/critic 흐름 ...
+def test_candidate_copying_source_expression_is_revised_with_snippet() -> None:
+    # generator stub 이 원문과 같은 문장을 반환하도록 설정
+    # → similarity_report.too_similar == True
+    # → verdict.status 가 REVISE(시도 한도 내)이고,
+    #   생성자에 전달된 feedback 에 "일치" 문구와 스니펫이 포함됐는지 확인
 ```
 
-구체적으로: generator 생성 직후 검사해서 위반이면 `needs_revision = True` + feedback="원문과 표현·구성이 재사용되었다. 다른 구성으로 다시 생성하라." 로 만들어
-기존 `status == "REVISE"` 분기(max_refine 내 재귀)가 실행되게 한다.
-
-**Step 4: 새 파이프라인 동작 단위 테스트 추가**
-
-`tests/unit/agents/test_pipeline_revision.py` (신규) 또는 기존 pipeline 테스트에:
-
-```python
-def test_candidate_copying_source_expression_is_revised() -> None:
-    # generator 가 원문과 같은 문장을 반환하도록 stub 후,
-    # verdict.status == "REVISE" 이고 attempts 가 증가하는지 확인
-```
-
-**Step 5: 전체 게이트 + 커밋**
+**Step 4: 전체 게이트 + 커밋**
 
 ```bash
 .venv\Scripts\python -m pytest -q
 .venv\Scripts\python -m ruff check src tests infra
 .venv\Scripts\python -m mypy
 git -C .. add generateQuestion6/src/math_variant/agents/pipeline.py generateQuestion6/tests/unit/agents/test_pipeline_revision.py
-git -C .. commit -m "feat: enforce deeper variation in the pipeline (similarity filter + wiring)"
+git -C .. commit -m "feat: enforce deeper variation in the pipeline (novelty feedback loop)"
 ```
 
 ---
