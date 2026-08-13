@@ -37,7 +37,16 @@ class OpenAICompatibleProvider:
         client = self._ensure_client()
         body = {
             "model": policy.model,
-            "messages": [{"role": "user", "content": prompt}],
+            # DeepSeek 는 response_format=json_object 사용 시 프롬프트에 "json" 단어가
+            # 반드시 있어야 400 을 반환하지 않는다. 어떤 프롬프트가 와도 만족하도록
+            # 시스템 메시지로 JSON 응답 지시를 항상 주입한다. (T08)
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "You must respond in JSON format only.",
+                },
+                {"role": "user", "content": prompt},
+            ],
             "temperature": policy.temperature,
             "max_tokens": policy.max_tokens,
             "response_format": {"type": "json_object"},
