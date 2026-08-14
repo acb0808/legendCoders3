@@ -51,12 +51,23 @@ def test_style_align_node_pure_function() -> None:
         sample_step="표준형으로 정리한다.",
     )
 
+    class DummyEmit:
+        def __init__(self) -> None:
+            self.events: list[tuple] = []
+
+        def emit(self, stage, status, message="", candidate_id=None, data=None) -> None:
+            self.events.append((stage, status, data))
+
+    class DummyContext:
+        emit = DummyEmit()
+
     class DummyRuntime:
-        context = None
+        context = DummyContext()
 
     state = {
         "candidate": cand,
         "style_guide": style_guide,
+        "candidate_id": "cand-1",
     }
 
     res = _style_align_node(state, DummyRuntime())  # type: ignore[arg-type]
@@ -65,6 +76,12 @@ def test_style_align_node_pure_function() -> None:
     assert len(aligned_cand.solution_steps) == 2
     # 마지막 단계의 justification 에 '따라서'가 추가되어 정렬되었는지 확인
     assert "따라서" in aligned_cand.solution_steps[1].justification
+    assert res.get("style_aligned") is True
+    from math_variant.events import EventStage
+
+    stages = [e[0] for e in DummyContext.emit.events]
+    assert EventStage.STYLE_ALIGN in stages
+
 
 
 def test_langchain_pipeline_with_style_align_enabled(tmp_path: Path) -> None:
@@ -150,3 +167,115 @@ def test_langchain_pipeline_with_style_align_enabled(tmp_path: Path) -> None:
 
     report = pipeline.run("원문 텍스트")
     assert len(report.candidates) == 1
+
+
+class _StyleRunnable:
+    def invoke(self, payload: dict) -> dict:
+        from math_variant.reference.models import SolutionStyle
+
+        return {
+            "patterns": [],
+            "phrasings": [],
+            "style": SolutionStyle(
+                unit="도형의 방정식",
+                open="주어진",
+                close="구하는 값은",
+                justification_vocab=["따라서"],
+            ),
+        }
+
+
+def test_langchain_pipeline_emits_style_align_and_summary(tmp_path: Path) -> None:
+    """그래프 실행 시 STYLE_ALIGN·REFERENCE 이벤트와 reference_summary·style_aligned 반영."""
+    shared_data: dict[str, Any] = {
+        "planner": {
+            "core_concepts": ["원의 방정식"],
+            "auxiliary_concepts": [],
+            "objective": "원의 중심과 반지름 구하기",
+            "answer_type": "expression",
+            "domain": "도형의 방정식",
+            "preservation_goals": ["성질"],
+            "forbidden_structure": ["골격"],
+            "strategy": {
+                "difficulty_target": "중",
+                "preservation_goals": ["성질"],
+                "variation_direction": ["수치 변형"],
+                "quality_criteria": ["명확성"],
+            },
+            "unresolved_assumptions": [],
+        },
+        "ideator": {
+            "idea_id": "idea-0",
+            "title": "질문 역전",
+            "preserved_concepts": ["원의 방정식"],
+            "changed_dimensions": ["objective"],
+            "change_description": ["설명"],
+            "construction_blueprint": "설계도",
+        },
+        "selector": {
+            "adopted_ideas": ["idea-0"],
+            "rationale": "합격",
+        },
+        "generator": {
+            "problem_text": "새로운 문제",
+            "formalization": {"symbols": ["x"], "constraints": ["x>0"], "goal": "a의 값"},
+            "final_answer_claim": "4",
+            "solution_steps": [
+                {"step_id": "1", "statement": "원 공식", "justification": "개념"},
+                {"step_id": "2", "statement": "정리", "justification": "값 산출"},
+            ],
+            "transformation_evidence": [],
+            "verification_script": "assert True",
+            "needs_figure": False,
+            "figure_notes": "",
+        },
+        "code_reviewer": {
+            "verdict": "APPROVE",
+            "safe": True,
+            "test_consistent": True,
+            "risk_notes": [],
+            "feedback": "",
+        },
+        "critic": {
+            "score": 9.0,
+            "difficulty_estimate": "중",
+            "criteria_scores": {"novelty": 4.5},
+            "comments": ["우수"],
+            "recommendation": "PASS",
+        },
+        "judge": {
+            "ranking": [{"candidate_id": "idea-0", "rank": 1}],
+            "summary": "우수",
+        },
+    }
+
+    engine = MockTrackingEngine(shared_data)
+    events: list[Any] = []
+    pipeline = build_pipeline_graph(
+        planner=PlannerAgent(engine, _p("planner.md")),
+        ideator=IdeatorAgent(engine, _p("ideator.md")),
+        selector=SelectorAgent(engine, _p("selector.md")),
+        generator=GeneratorAgent(engine, _p("candidate_generator.md")),
+        code_reviewer=CodeReviewAgent(engine, _p("code_reviewer.md")),
+        critic=CriticAgent(engine, _p("critic.md")),
+        judge=JudgeAgent(engine, _p("judge.md")),
+        vision=None,
+        sandbox=MockSandboxProvider(),
+        blind_solvers=MockBlindSolver(),
+        runs_dir=tmp_path / "runs",
+        ideator_count=1,
+        on_event=events.append,
+        reference_runnable=_StyleRunnable(),
+        enable_style_align=True,
+    )
+
+    from math_variant.events import EventStage
+
+    report = pipeline.run("원문 텍스트")
+    stages = [e.stage for e in events]
+    assert EventStage.REFERENCE in stages
+    assert EventStage.STYLE_ALIGN in stages
+    assert report.candidates[0].style_aligned is True
+    assert report.reference_summary is not None
+    assert report.reference_summary["style_guide"]["unit"] == "도형의 방정식"
+

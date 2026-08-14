@@ -74,10 +74,12 @@ from math_variant.reference.models import (
     SolutionStyle,
 )
 from math_variant.reference.sections import (
+    build_reference_summary,
     generator_condition_section,
     generator_style_section,
     ideator_pattern_section,
 )
+
 from math_variant.sandbox.provider import DockerSandboxProvider, SandboxProvider
 from math_variant.services.blind_solver import BlindConsensus, BlindSolution, BlindSolver
 from math_variant.verifiers.test_runner import (
@@ -193,7 +195,9 @@ class PipelineState(TypedDict, total=False):
     attempts: int
     feedback: str
     candidate: CandidateProblem
+    style_aligned: bool
     generator_output: GeneratorOutput
+
     too_similar: bool
     failed: bool
     review: CodeReviewOutput
@@ -243,7 +247,7 @@ def _enrich_references_node(
     topics = ",".join(planner_out.core_concepts) if planner_out else ""
     if ctx.reference_runnable is not None and topics:
         ctx.emit.emit(
-            EventStage.PLANNER, "started", "참조 자산(출제 패턴·조건 관례·해설 가이드) 검색"
+            EventStage.REFERENCE, "started", "참조 자산(출제 패턴·조건 관례·해설 가이드) 검색"
         )
         ref_res = ctx.reference_runnable.invoke({"topics": topics})
         pats = ref_res.get("patterns", [])
@@ -252,7 +256,17 @@ def _enrich_references_node(
         p_sec = ideator_pattern_section(pats)
         c_sec = generator_condition_section(conds)
         s_sec = generator_style_section(style)
-        ctx.emit.emit(EventStage.PLANNER, "done", "참조 자산 주입 완료")
+        ctx.emit.emit(
+            EventStage.REFERENCE,
+            "done",
+            "참조 자산 주입 완료",
+            data={
+                "exam_patterns": len(pats),
+                "condition_phrasings": len(conds),
+                "style_unit": style.unit if style else None,
+            },
+        )
+
     else:
         pats = []
         conds = []
@@ -393,11 +407,23 @@ def _generate_node(state: PipelineState, runtime: Runtime[PipelineContext]) -> d
         if planner_out is not None
         else (blueprint.preserved_concepts if blueprint is not None else [])
     )
+    ctx.emit.emit(
+        EventStage.SKILL_MAPPING, "started", "지식체계 스킬 매핑", state["candidate_id"]
+    )
     skill_evidences = assign_skill_ids(
         candidate.solution_steps,
         concepts=core_concepts,
     )
     candidate.transformation_evidence.extend(skill_evidences)
+    matched = sum(1 for ev in skill_evidences if ev.get("skill_id") is not None)
+    ctx.emit.emit(
+        EventStage.SKILL_MAPPING,
+        "done",
+        f"매핑 완료 ({matched}/{len(skill_evidences)})",
+        state["candidate_id"],
+        data={"matched": matched, "total": len(skill_evidences)},
+    )
+
 
     from math_variant.services.similarity import similarity_report
 
@@ -579,14 +605,26 @@ def _style_align_node(
     state: PipelineState, runtime: Runtime[PipelineContext]
 ) -> dict[str, Any]:
     """해설 스타일 가이드(solveSkill grounding 패턴)에 따라 풀이 단계를 정렬한다 (M6)."""
+    ctx = runtime.context
     style_guide = state.get("style_guide")
     candidate = state.get("candidate")
+    ctx.emit.emit(
+        EventStage.STYLE_ALIGN, "started", "해설 스타일 가이드 정렬", state.get("candidate_id")
+    )
     if style_guide is None or candidate is None or not candidate.solution_steps:
+        ctx.emit.emit(
+            EventStage.STYLE_ALIGN,
+            "done",
+            "정렬 대상 없음 — 생략",
+            state.get("candidate_id"),
+            data={"applied": False},
+        )
         return {}
 
     aligned_steps: list[SolutionStepClaim] = []
     vocab = style_guide.justification_vocab or ["따라서"]
     primary_vocab = vocab[0] if vocab else "따라서"
+    applied = False
 
     for i, step in enumerate(candidate.solution_steps):
         statement = step.statement
@@ -596,6 +634,7 @@ def _style_align_node(
         if i == len(candidate.solution_steps) - 1:
             if not any(v in justification or v in statement for v in vocab):
                 justification = f"{primary_vocab} {justification}".strip()
+                applied = True
 
         aligned_steps.append(
             SolutionStepClaim(
@@ -607,7 +646,14 @@ def _style_align_node(
         )
 
     candidate.solution_steps = aligned_steps
-    return {"candidate": candidate}
+    ctx.emit.emit(
+        EventStage.STYLE_ALIGN,
+        "done",
+        "스타일 정렬 완료",
+        state.get("candidate_id"),
+        data={"applied": applied, "vocab": vocab},
+    )
+    return {"candidate": candidate, "style_aligned": applied}
 
 
 def _verdict_node(state: PipelineState, runtime: Runtime[PipelineContext]) -> dict[str, Any]:
@@ -663,8 +709,10 @@ def _verdict(
         blind_consensus=state.get("consensus"),
         critic=critic,
         attempts=state["attempts"],
+        style_aligned=state.get("style_aligned", False),
         status=status,
     )
+
 
 
 def _verdict_route(state: PipelineState, runtime: Runtime[PipelineContext]) -> str:
@@ -718,7 +766,13 @@ def _report_node(state: PipelineState, runtime: Runtime[PipelineContext]) -> dic
         adopted_ideas=state["selection_out"].adopted_ideas,
         candidates=verdicts,
         ranking=state.get("ranking", []),
+        reference_summary=build_reference_summary(
+            state.get("exam_patterns"),
+            state.get("condition_refs"),
+            state.get("style_guide"),
+        ),
     )
+
     ctx.emit.emit(EventStage.DONE, "done", f"완료 — 후보 {len(report.candidates)}건")
     ctx.runs_dir.mkdir(parents=True, exist_ok=True)
     (ctx.runs_dir / "report.json").write_text(
