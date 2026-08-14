@@ -46,6 +46,26 @@ export interface SolutionStep {
   justification?: string;
 }
 
+export interface TransformationEvidence {
+  dimension: string;
+  step_id?: string;
+  skill_id?: string | null;
+  concept_name?: string;
+  reason?: string;
+  description?: string;
+}
+
+export interface ReferenceSummary {
+  exam_patterns: {
+    topic_id: string;
+    unit: string;
+    pattern: string;
+    source_count: number;
+  }[];
+  condition_phrasings: { count: number; topics: string[] };
+  style_guide: { unit: string; justification_vocab: string[] } | null;
+}
+
 export interface Candidate {
   candidate_id: string;
   plan_id: string;
@@ -57,8 +77,9 @@ export interface Candidate {
   };
   final_answer_claim: string;
   solution_steps: SolutionStep[];
-  transformation_evidence: { dimension: string }[];
+  transformation_evidence: TransformationEvidence[];
   verification_status: VerificationStatus;
+  style_aligned?: boolean;
   validation_ref?: string | null;
   rubric?: Rubric | null;
   evidence?: ValidationEvidence | null;
@@ -85,9 +106,11 @@ export interface GenerationRun {
   state: string;
   source?: RunSource | null;
   candidates: Candidate[];
+  reference_summary?: ReferenceSummary | null;
   created_at: string;
   updated_at: string;
 }
+
 
 export interface RunSummary {
   run_id: string;
