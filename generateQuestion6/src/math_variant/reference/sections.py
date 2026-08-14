@@ -6,7 +6,9 @@ LangChain RunnableParallel 을 통해 3종 리트리버를 병렬 실행하는 �
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any
+
 
 from langchain_core.documents import Document
 from langchain_core.runnables import Runnable, RunnableLambda, RunnableParallel
@@ -180,3 +182,42 @@ def build_reference_runnable(
         phrasings=RunnableLambda(lambda x: condition_retriever.get_phrasings(x["topics"])),
         style=RunnableLambda(lambda x: style_retriever.get_style(x["topics"])),
     )
+
+
+def build_reference_summary(
+    patterns: Sequence[ExamPatternCard] | None,
+    phrasings: Sequence[ConditionPhrasing] | None,
+    style: SolutionStyle | None,
+) -> dict[str, Any] | None:
+    """참조 자산 검색 결과를 실행 리포트용 요약으로 압축한다.
+
+    모두 비어 있으면 None 을 반환한다 (레퍼런스 비활성 실행과 호환).
+    """
+    if not patterns and not phrasings and style is None:
+        return None
+    return {
+        "exam_patterns": [
+            {
+                "topic_id": p.topic_id,
+                "unit": p.unit,
+                "pattern": p.pattern,
+                "source_count": p.source_count,
+            }
+            for p in (patterns or [])
+        ],
+        "condition_phrasings": {
+            "count": sum(
+                len(c.patterns) + len(c.wording_conventions) for c in (phrasings or [])
+            ),
+            "topics": [c.unit for c in (phrasings or [])],
+        },
+        "style_guide": (
+            {
+                "unit": style.unit,
+                "justification_vocab": style.justification_vocab,
+            }
+            if style is not None
+            else None
+        ),
+    }
+

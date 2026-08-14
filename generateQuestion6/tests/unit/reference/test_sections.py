@@ -18,12 +18,14 @@ from math_variant.reference.models import (
 )
 from math_variant.reference.sections import (
     build_reference_runnable,
+    build_reference_summary,
     critic_scope_section,
     generator_condition_section,
     generator_style_section,
     ideator_pattern_section,
     planner_scope_section,
 )
+
 from math_variant.reference.style_retriever import SolutionStyleRetriever
 
 
@@ -152,3 +154,45 @@ def test_build_reference_runnable_parallel_execution(tmp_path: Path) -> None:
     assert len(result["patterns"]) == 1
     assert len(result["phrasings"]) == 1
     assert result["style"] is not None
+
+
+def test_build_reference_summary_compresses_results() -> None:
+    """검색 결과를 리포트용 요약으로 압축한다."""
+    summary = build_reference_summary(
+        [
+            ExamPatternCard(
+                topic_id="t1",
+                unit="도형의 방정식",
+                pattern="접선의 방정식",
+                wording="접선을 구하시오",
+                example_abstract="원에 접선",
+                source_count=2,
+            )
+        ],
+        [
+            ConditionPhrasing(
+                topic_id="t1",
+                unit="도형의 방정식",
+                patterns=["조건 A"],
+                wording_conventions=["관례 B"],
+            )
+        ],
+        SolutionStyle(
+            unit="도형의 방정식",
+            open="주어진",
+            close="구하는 값은",
+            justification_vocab=["따라서"],
+        ),
+    )
+    assert summary is not None
+    assert summary["exam_patterns"][0]["unit"] == "도형의 방정식"
+    assert summary["exam_patterns"][0]["source_count"] == 2
+    assert summary["condition_phrasings"]["count"] == 2
+    assert summary["condition_phrasings"]["topics"] == ["도형의 방정식"]
+    assert summary["style_guide"]["justification_vocab"] == ["따라서"]
+
+
+def test_build_reference_summary_returns_none_when_empty() -> None:
+    """검색 결과가 전부 비어 있으면 None (기존 run 데이터와 호환)."""
+    assert build_reference_summary([], [], None) is None
+
