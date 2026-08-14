@@ -558,18 +558,31 @@ class _StyleRunnable:
 
 def test_langchain_pipeline_emits_style_align_and_summary(tmp_path: Path) -> None:
     """그래프 실행 시 STYLE_ALIGN·REFERENCE 이벤트와 reference_summary·style_aligned 반영."""
+    # 주의: 바로 위 test_langchain_pipeline_with_style_align_enabled 의
+    # shared_data dict·engine = MockTrackingEngine(shared_data)·_p 헬퍼를 그대로
+    # 복사해 사용한다 (에이전트·프롬프트 구성 동일). `...` 자리에 각 에이전트 인자를 채운다.
     events: list[Any] = []
     pipeline = build_pipeline_graph(
         planner=PlannerAgent(engine, _p("planner.md")),
-        ...
+        ideator=IdeatorAgent(engine, _p("ideator.md")),
+        selector=SelectorAgent(engine, _p("selector.md")),
+        generator=GeneratorAgent(engine, _p("candidate_generator.md")),
+        code_reviewer=CodeReviewAgent(engine, _p("code_reviewer.md")),
+        critic=CriticAgent(engine, _p("critic.md")),
+        judge=JudgeAgent(engine, _p("judge.md")),
+        vision=None,
+        sandbox=MockSandboxProvider(),
+        blind_solvers=MockBlindSolver(),
+        runs_dir=tmp_path / "runs",
         ideator_count=1,
         on_event=events.append,
         reference_runnable=_StyleRunnable(),
         enable_style_align=True,
     )
-    report = pipeline.run("원문 텍스트")
+
     from math_variant.events import EventStage
 
+    report = pipeline.run("원문 텍스트")
     stages = [e.stage for e in events]
     assert EventStage.REFERENCE in stages
     assert EventStage.STYLE_ALIGN in stages
@@ -577,8 +590,6 @@ def test_langchain_pipeline_emits_style_align_and_summary(tmp_path: Path) -> Non
     assert report.reference_summary is not None
     assert report.reference_summary["style_guide"]["unit"] == "도형의 방정식"
 ```
-
-(기존 `test_langchain_pipeline_with_style_align_enabled`의 shared_data·엔진 구성을 재사용하거나 위와 같이 새 테스트로 분리 — 구현 시 판단.)
 
 **Step 2: Run test to verify it fails**
 
@@ -1114,7 +1125,8 @@ it("skill_mapping 증거와 스타일 정렬 배지를 표시한다", () => {
   render(<CandidateList candidates={[candidate]} onDecide={vi.fn()} />);
 
   expect(screen.getByText("스타일 정렬됨")).toBeInTheDocument();
-  expect(screen.getByText(/skill 101 · 원의 방정식/)).toBeInTheDocument();
+  // 주의: 해설 배지와 변형 설명 항목 양쪽에 나타나므로 getAllByText 사용
+  expect(screen.getAllByText(/skill 101 · 원의 방정식/).length).toBeGreaterThan(0);
 });
 
 it("매핑 실패한 단계는 '매핑 없음'으로 표시한다", () => {
@@ -1168,23 +1180,27 @@ function skillForStep(
         ) : null}
 ```
 
-해설 단계 (solution-statement span 뒤):
+해설 단계 — map 콜백을 블록 바디로 바꿔 스킬 변수를 지역 선언 (non-null assertion 금지):
 
 ```tsx
-            <li key={step.step_id}>
-              <span className="solution-index">{index + 1}</span>
-              <span className="solution-statement">
-                <LatexText text={step.statement} />
-              </span>
-              {(() => {
-                const skill = skillForStep(candidate.transformation_evidence, step.step_id);
-                return skill ? (
+        <ol className="candidate-solution">
+          {candidate.solution_steps.map((step, index) => {
+            const skill = skillForStep(candidate.transformation_evidence, step.step_id);
+            return (
+              <li key={step.step_id}>
+                <span className="solution-index">{index + 1}</span>
+                <span className="solution-statement">
+                  <LatexText text={step.statement} />
+                </span>
+                {skill ? (
                   <span className="skill-badge">
                     skill {skill.skill_id} · {skill.concept_name ?? "개념"}
                   </span>
-                ) : null;
-              })()}
-            </li>
+                ) : null}
+              </li>
+            );
+          })}
+        </ol>
 ```
 
 변형 설명 목록 교체:
