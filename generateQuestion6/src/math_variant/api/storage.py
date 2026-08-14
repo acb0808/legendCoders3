@@ -95,9 +95,11 @@ class RunStore:
             "state": data.get("state", "UNKNOWN"),
             "source": data.get("source"),
             "candidates": visible,
+            "reference_summary": data.get("reference_summary"),
             "created_at": data.get("created_at"),
             "updated_at": data.get("updated_at"),
         }
+
 
     def apply_decision(
         self,

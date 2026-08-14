@@ -21,9 +21,11 @@ def report_to_run_store(report: PipelineReport) -> dict[str, Any]:
         "run_id": report.run_id,
         "state": "GENERATED",
         "candidates": [_candidate_to_dict(v) for v in report.candidates],
+        "reference_summary": report.reference_summary,
         "created_at": report.created_at.isoformat(),
         "updated_at": report.created_at.isoformat(),
     }
+
 
 
 def _verdict_to_status(status: str) -> VerificationStatus:
@@ -74,7 +76,9 @@ def _candidate_to_dict(verdict: CandidateVerdict) -> dict[str, Any]:
         "solution_steps": [step.model_dump(mode="json") for step in candidate.solution_steps],
         "transformation_evidence": candidate.transformation_evidence,
         "verification_status": status,
+        "style_aligned": verdict.style_aligned,
         "validation_ref": candidate.validation_ref,
+
         "blueprint_title": verdict.blueprint_title,
         "critic_score": verdict.critic.score if verdict.critic else None,
         "code_review_verdict": verdict.code_review.verdict if verdict.code_review else None,

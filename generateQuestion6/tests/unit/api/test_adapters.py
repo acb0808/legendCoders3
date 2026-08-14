@@ -169,3 +169,45 @@ def test_report_to_run_store_solver_disagreement_maps_to_unresolved() -> None:
     assert stored["verification_status"] == "PASS"
     blind = next(c for c in stored["evidence"]["checks"] if c["kind"] == "blind")
     assert blind["status"] == "UNRESOLVED"
+
+
+def test_report_to_run_store_carries_reference_summary_and_style_flag() -> None:
+    verdict = _pass_verdict()
+    report = PipelineReport(
+        run_id="run-1",
+        planner=_planner(),
+        ideas=[],
+        adopted_ideas=[],
+        candidates=[verdict],
+        ranking=[],
+        reference_summary={
+            "exam_patterns": [
+                {
+                    "topic_id": "t1",
+                    "unit": "도형의 방정식",
+                    "pattern": "접선",
+                    "source_count": 2,
+                }
+            ],
+            "condition_phrasings": {"count": 2, "topics": ["도형의 방정식"]},
+            "style_guide": {"unit": "도형의 방정식", "justification_vocab": ["따라서"]},
+        },
+    )
+    data = report_to_run_store(report)
+    assert data["reference_summary"]["exam_patterns"][0]["unit"] == "도형의 방정식"
+    assert data["candidates"][0]["style_aligned"] is False
+    json.dumps(data, ensure_ascii=False)
+
+
+def test_report_to_run_store_defaults_reference_summary_to_none() -> None:
+    report = PipelineReport(
+        run_id="run-1",
+        planner=_planner(),
+        ideas=[],
+        adopted_ideas=[],
+        candidates=[_pass_verdict()],
+        ranking=[],
+    )
+    data = report_to_run_store(report)
+    assert data["reference_summary"] is None
+
