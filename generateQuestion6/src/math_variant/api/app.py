@@ -11,7 +11,9 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import threading
+
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -117,6 +119,16 @@ def _reset_active_job() -> None:
     _active_job_id = None
 
 
+def resolve_engine(env_value: str | None) -> Literal["default", "langchain"]:
+    """웹 기본 엔진은 langchain. MATH_VARIANT_PIPELINE_ENGINE=default 로 복귀 가능."""
+    return env_value if env_value in {"default", "langchain"} else "langchain"
+
+
+def resolve_style_align(env_value: str | None) -> bool:
+    """웹 기본 스타일 정렬은 켬. MATH_VARIANT_STYLE_ALIGN=0 으로 끌 수 있다."""
+    return (env_value or "1").strip() == "1"
+
+
 class PipelineRunner:
     """JobStore 에 이벤트를 기록하면서 파이프라인을 백그라운드로 실행한다."""
 
@@ -153,17 +165,20 @@ class PipelineRunner:
         try:
             self.jobs.set_status(job_id, "running")
             pipeline = build_pipeline(
+                engine=resolve_engine(os.getenv("MATH_VARIANT_PIPELINE_ENGINE")),
                 ideator_count=int(options.get("ideator_count", 3)),
                 max_refine=int(options.get("max_refine", 2)),
                 on_event=_on_event,
                 runs_dir=Path("runs") / "artifacts" / job_id,
                 figures_dir=Path("runs") / "artifacts" / job_id / "figures",
                 sandbox_image=self.sandbox_image,
+                enable_style_align=resolve_style_align(os.getenv("MATH_VARIANT_STYLE_ALIGN")),
             )
             report = pipeline.run(
                 normalize_source(source_text),
                 difficulty_target=str(options.get("difficulty_target", "")),
             )
+
         except MathVariantError as exc:
             self.jobs.fail(job_id, exc.error.message, exc.code.value)
         except Exception as exc:  # 러너에서 어떤 실패도 job 에 남긴다

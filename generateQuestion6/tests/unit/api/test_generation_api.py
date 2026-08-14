@@ -203,7 +203,8 @@ def test_failed_job_releases_active_lock(client: TestClient, monkeypatch) -> Non
             StructuredError(code=ErrorCode.AGENT_UNRESOLVED, message="고의 실패")
         )
 
-    monkeypatch.setattr(pipeline_factory_module, "build_agent_pipeline", _boom)
+    monkeypatch.setattr(pipeline_factory_module, "build_pipeline", _boom)
+
     monkeypatch.setattr(
         api_module,
         "_runner",
@@ -228,3 +229,25 @@ def test_failed_job_releases_active_lock(client: TestClient, monkeypatch) -> Non
         json={"source": {"mode": "text", "text": "두번째"}, "options": {}},
     )
     assert response.status_code == 200
+
+
+def test_resolve_engine_defaults_to_langchain() -> None:
+    """웹 기본 엔진은 langchain. env 로 기존 엔진 복귀 가능."""
+    from math_variant.api.app import resolve_engine
+
+    assert resolve_engine(None) == "langchain"
+    assert resolve_engine("") == "langchain"
+    assert resolve_engine("bogus") == "langchain"
+    assert resolve_engine("default") == "default"
+    assert resolve_engine("langchain") == "langchain"
+
+
+def test_resolve_style_align_defaults_on() -> None:
+    """웹 기본 스타일 정렬은 켬. env=0 으로 끌 수 있다."""
+    from math_variant.api.app import resolve_style_align
+
+    assert resolve_style_align(None) is True
+    assert resolve_style_align("1") is True
+    assert resolve_style_align("0") is False
+    assert resolve_style_align("false") is False
+

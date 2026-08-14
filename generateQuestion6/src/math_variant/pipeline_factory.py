@@ -181,6 +181,7 @@ def build_pipeline(
     scope_section: str | None = None,
     critic_scope_section: str | None = None,
     reference_runnable: Runnable[dict[str, str], dict[str, Any]] | None = None,
+    enable_style_align: bool | None = None,
 ) -> PipelineRunnerProtocol:
     """엔진 설정(또는 MATH_VARIANT_PIPELINE_ENGINE 환경변수)에 따라 파이프라인을 생성한다."""
     chosen_engine = engine or os.getenv("MATH_VARIANT_PIPELINE_ENGINE", "default").lower()
@@ -210,7 +211,9 @@ def build_pipeline(
             scope_section=sec_planner,
             critic_scope_section=sec_critic,
             reference_runnable=runnable,
+            enable_style_align=enable_style_align,
         )
+
 
     return build_agent_pipeline(
         ideator_count=ideator_count,
