@@ -97,4 +97,16 @@ describe("ProgressView (T08)", () => {
     render(<ProgressView jobId="run-1" />);
     expect(await screen.findByText(/boom/)).toBeInTheDocument();
   });
+
+  it("레퍼런스 레이어 단계가 체크리스트에 표시된다", async () => {
+    vi.spyOn(api, "getJob").mockResolvedValue(makeJob());
+    vi.spyOn(api, "streamJobEvents").mockImplementation(() => () => {});
+
+    render(<ProgressView jobId="run-1" />);
+
+    expect(await screen.findByTestId("stage-reference")).toHaveTextContent("참조 검색");
+    expect(screen.getByTestId("stage-skill_mapping")).toHaveTextContent("스킬 매핑");
+    expect(screen.getByTestId("stage-style_align")).toHaveTextContent("스타일 정렬");
+  });
 });
+

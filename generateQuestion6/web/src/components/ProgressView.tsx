@@ -9,6 +9,7 @@ import { CallLog } from "./CallLog";
 
 const STAGE_ORDER = [
   "planner",
+  "reference",
   "ideation",
   "selection",
   "generation",
@@ -16,12 +17,15 @@ const STAGE_ORDER = [
   "sandbox",
   "blind",
   "critic",
+  "skill_mapping",
+  "style_align",
   "judge",
   "done",
 ];
 
 const STAGE_LABELS: Record<string, string> = {
   planner: "기획",
+  reference: "참조 검색",
   ideation: "발상",
   selection: "선별",
   generation: "생성",
@@ -29,9 +33,12 @@ const STAGE_LABELS: Record<string, string> = {
   sandbox: "샌드박스 검증",
   blind: "블라인드 합의",
   critic: "비평",
+  skill_mapping: "스킬 매핑",
+  style_align: "스타일 정렬",
   judge: "집계",
   done: "완료",
 };
+
 
 /** 실시간 생성 진행 화면 — 단계 체크리스트 + LLM 호출 로그 (SSE). */
 export function ProgressView({ jobId }: { jobId: string }) {
