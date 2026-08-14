@@ -147,4 +147,37 @@ describe("T06.4-UT5 상태는 항상 보이고 상세는 접을 수 있다", () 
     fireEvent.click(screen.getByRole("button", { name: "상세 증거 보기" }));
     expect(screen.getAllByText("근거").length).toBeGreaterThan(0);
   });
+
+  it("skill_mapping 증거와 스타일 정렬 배지를 표시한다", () => {
+    const candidate = makeCandidate({
+      transformation_evidence: [
+        { dimension: "representation" },
+        {
+          dimension: "skill_mapping",
+          step_id: "s1",
+          skill_id: "101",
+          concept_name: "원의 방정식",
+        },
+      ],
+      style_aligned: true,
+    });
+    render(<CandidateList candidates={[candidate]} onDecide={vi.fn()} />);
+
+    expect(screen.getByText("스타일 정렬됨")).toBeInTheDocument();
+    // 주의: 해설 배지와 변형 설명 항목 양쪽에 나타나므로 getAllByText 사용
+    expect(screen.getAllByText(/skill 101 · 원의 방정식/).length).toBeGreaterThan(0);
+  });
+
+  it("매핑 실패한 단계는 '매핑 없음'으로 표시한다", () => {
+    const candidate = makeCandidate({
+      transformation_evidence: [
+        { dimension: "skill_mapping", step_id: "s1", skill_id: null, reason: "no_match" },
+      ],
+    });
+    render(<CandidateList candidates={[candidate]} onDecide={vi.fn()} />);
+
+    expect(screen.getByText(/매핑 없음/)).toBeInTheDocument();
+    expect(screen.queryByText("스타일 정렬됨")).not.toBeInTheDocument();
+  });
 });
+
