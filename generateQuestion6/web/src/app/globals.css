@@ -1621,8 +1621,57 @@ a {
   transition: background 0.15s ease, color 0.15s ease;
 }
 
-.button-delete:hover {
-  background: var(--red-soft);
+/* ---------------- 레퍼런스 레이어 노출 스타일 ---------------- */
+
+.style-align-badge {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: #dcfce7;
+  color: #166534;
+  font-size: 0.75rem;
+  vertical-align: middle;
+}
+
+.skill-badge {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 6px;
+  background: #eef2ff;
+  color: #3730a3;
+  font-size: 0.75rem;
+}
+
+.reference-summary {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  margin: 1rem 0;
+}
+
+.reference-summary h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.05rem;
+}
+
+.reference-summary h3 {
+  margin: 0 0 0.35rem;
+  font-size: 0.9rem;
+  color: #475569;
+}
+
+.reference-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.reference-summary ul {
+  margin: 0;
+  padding-left: 1.1rem;
 }
 
 /* ---------------- 모션 ---------------- */
@@ -1637,6 +1686,7 @@ a {
     transform: translateY(0);
   }
 }
+
 
 @media (prefers-reduced-motion: reduce) {
   * {

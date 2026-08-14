@@ -66,6 +66,45 @@ export function ReviewClient({ runIdPromise }: { runIdPromise: Promise<{ runId: 
           <pre>{run.source.text}</pre>
         </section>
       ) : null}
+      {run.reference_summary ? (
+        <section
+          className="reference-summary"
+          data-testid="reference-summary"
+          aria-label="참조 요약"
+        >
+          <h2>참조 요약</h2>
+          <div className="reference-summary-grid">
+            <div>
+              <h3>기출 패턴 ({run.reference_summary.exam_patterns.length})</h3>
+              <ul>
+                {run.reference_summary.exam_patterns.map((pattern) => (
+                  <li key={pattern.topic_id}>
+                    {pattern.unit} · {pattern.pattern} ({pattern.source_count}건)
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <h3>조건 표현 관례</h3>
+              <p>
+                {run.reference_summary.condition_phrasings.count}건 ·{" "}
+                {run.reference_summary.condition_phrasings.topics.join(", ") || "없음"}
+              </p>
+            </div>
+            <div>
+              <h3>해설 스타일 가이드</h3>
+              {run.reference_summary.style_guide ? (
+                <p>
+                  {run.reference_summary.style_guide.unit} · 결론 어휘:{" "}
+                  {run.reference_summary.style_guide.justification_vocab.join(", ")}
+                </p>
+              ) : (
+                <p>없음</p>
+              )}
+            </div>
+          </div>
+        </section>
+      ) : null}
       <CandidateList
         candidates={run.candidates}
         onDecide={handleDecide}
@@ -73,3 +112,4 @@ export function ReviewClient({ runIdPromise }: { runIdPromise: Promise<{ runId: 
     </>
   );
 }
+
