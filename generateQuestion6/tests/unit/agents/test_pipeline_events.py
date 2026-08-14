@@ -23,7 +23,6 @@ from math_variant.reference.models import ConditionPhrasing, ExamPatternCard, So
 from math_variant.sandbox.contracts import SandboxResult, SandboxStatus
 from math_variant.services.blind_solver import BlindConsensus
 
-
 _PLANNER = {
     "core_concepts": ["포물선", "평행이동"],
     "auxiliary_concepts": [],

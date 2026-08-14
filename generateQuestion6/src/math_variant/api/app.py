@@ -13,7 +13,6 @@ from __future__ import annotations
 import asyncio
 import os
 import threading
-
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -121,7 +120,10 @@ def _reset_active_job() -> None:
 
 def resolve_engine(env_value: str | None) -> Literal["default", "langchain"]:
     """웹 기본 엔진은 langchain. MATH_VARIANT_PIPELINE_ENGINE=default 로 복귀 가능."""
-    return env_value if env_value in {"default", "langchain"} else "langchain"
+    if env_value == "default":
+        return "default"
+    return "langchain"
+
 
 
 def resolve_style_align(env_value: str | None) -> bool:

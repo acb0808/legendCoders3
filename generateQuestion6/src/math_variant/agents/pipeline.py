@@ -53,7 +53,6 @@ from math_variant.reference.sections import (
     generator_style_section,
     ideator_pattern_section,
 )
-
 from math_variant.sandbox.provider import SandboxProvider
 from math_variant.services.blind_solver import BlindConsensus
 from math_variant.verifiers.test_runner import (

@@ -25,7 +25,6 @@ from math_variant.reference.sections import (
     ideator_pattern_section,
     planner_scope_section,
 )
-
 from math_variant.reference.style_retriever import SolutionStyleRetriever
 
 

@@ -9,7 +9,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
-
 from langchain_core.documents import Document
 from langchain_core.runnables import Runnable, RunnableLambda, RunnableParallel
 

@@ -11,9 +11,10 @@ function skillForStep(
   const entry = evidence.find(
     (e) => e.dimension === "skill_mapping" && e.step_id === stepId,
   );
-  if (!entry || entry.skill_id == null) {
+  if (!entry || entry.skill_id === null || entry.skill_id === undefined) {
     return null;
   }
+
   return { skill_id: entry.skill_id, concept_name: entry.concept_name };
 }
 
