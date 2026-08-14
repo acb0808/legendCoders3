@@ -19,8 +19,10 @@ from math_variant.events import EventStage, PipelineEvent
 from math_variant.providers.contracts import ProviderResponse, RolePolicy
 from math_variant.providers.registry import SchemaRegistry
 from math_variant.providers.structured import StructuredOutputEngine
+from math_variant.reference.models import ConditionPhrasing, ExamPatternCard, SolutionStyle
 from math_variant.sandbox.contracts import SandboxResult, SandboxStatus
 from math_variant.services.blind_solver import BlindConsensus
+
 
 _PLANNER = {
     "core_concepts": ["포물선", "평행이동"],
@@ -154,6 +156,7 @@ def test_pipeline_emits_stage_events_in_order(tmp_path) -> None:
         EventStage.IDEATION,
         EventStage.SELECTION,
         EventStage.GENERATION,
+        EventStage.SKILL_MAPPING,
         EventStage.CODE_REVIEW,
         EventStage.SANDBOX,
         EventStage.BLIND,
@@ -161,6 +164,7 @@ def test_pipeline_emits_stage_events_in_order(tmp_path) -> None:
         EventStage.JUDGE,
     ]
     assert order == expected
+
 
 
 def test_pipeline_emits_sandbox_and_candidate_scoped_events(tmp_path) -> None:
@@ -216,3 +220,67 @@ def test_pipeline_skips_sandbox_on_rejected_review(tmp_path) -> None:
 
     assert all(e.stage != EventStage.SANDBOX for e in events)
     assert events[-1].stage == EventStage.DONE
+
+
+class _FakeReferenceRunnable:
+    def invoke(self, payload: dict) -> dict:
+        return {
+            "patterns": [
+                ExamPatternCard(
+                    topic_id="t1",
+                    unit="도형의 방정식",
+                    pattern="접선의 방정식",
+                    wording="접선을 구하시오",
+                    example_abstract="원에 접선",
+                    source_count=2,
+                )
+            ],
+            "phrasings": [
+                ConditionPhrasing(
+                    topic_id="t1",
+                    unit="도형의 방정식",
+                    patterns=["조건 A"],
+                    wording_conventions=["관례 B"],
+                )
+            ],
+            "style": SolutionStyle(
+                unit="도형의 방정식",
+                open="주어진",
+                close="구하는 값은",
+                justification_vocab=["따라서"],
+            ),
+        }
+
+
+def test_pipeline_emits_reference_and_skill_mapping_events(tmp_path) -> None:
+    engine = _Engine(
+        {
+            "planner": [_PLANNER],
+            "ideator": [_IDEA],
+            "selector": [{"adopted_ideas": ["idea-1"], "rationale": "부합"}],
+            "generator": [_CANDIDATE],
+            "code_reviewer": [_REVIEW],
+            "critic": [_CRITIC],
+            "judge": [_JUDGE],
+        }
+    )
+    events: list[PipelineEvent] = []
+    pipeline = _build_pipeline(engine, tmp_path, events.append)
+    pipeline.reference_runnable = _FakeReferenceRunnable()  # type: ignore[assignment]
+    report = pipeline.run("원문")
+
+    ref_events = [e for e in events if e.stage == EventStage.REFERENCE]
+    assert [e.status for e in ref_events] == ["started", "done"]
+    assert ref_events[-1].data["exam_patterns"] == 1
+    assert ref_events[-1].data["condition_phrasings"] == 1
+    assert ref_events[-1].data["style_unit"] == "도형의 방정식"
+
+    skill_events = [e for e in events if e.stage == EventStage.SKILL_MAPPING]
+    assert skill_events
+    assert skill_events[0].candidate_id == "cand-1"
+    assert skill_events[-1].data["total"] == 1
+
+    assert report.reference_summary is not None
+    assert report.reference_summary["exam_patterns"][0]["pattern"] == "접선의 방정식"
+    assert report.candidates[0].style_aligned is False
+

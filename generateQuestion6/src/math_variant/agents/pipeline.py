@@ -46,11 +46,14 @@ from math_variant.domain.candidate import CandidateProblem
 from math_variant.errors import ErrorCode, MathVariantError, StructuredError
 from math_variant.events import EventStage, PipelineEvent
 from math_variant.reference.knowledge_graph import assign_skill_ids
+from math_variant.reference.models import ConditionPhrasing, ExamPatternCard, SolutionStyle
 from math_variant.reference.sections import (
+    build_reference_summary,
     generator_condition_section,
     generator_style_section,
     ideator_pattern_section,
 )
+
 from math_variant.sandbox.provider import SandboxProvider
 from math_variant.services.blind_solver import BlindConsensus
 from math_variant.verifiers.test_runner import (
@@ -78,6 +81,7 @@ class CandidateVerdict(BaseModel):
     blind_consensus: BlindConsensus | None = None
     critic: CriticOutput | None = None
     attempts: int = 1
+    style_aligned: bool = False
     status: Literal["PASS", "FAIL", "UNRESOLVED", "REVISE"] = "UNRESOLVED"
 
 
@@ -93,6 +97,8 @@ class PipelineReport(BaseModel):
     adopted_ideas: list[str]
     candidates: list[CandidateVerdict]
     ranking: list[dict[str, Any]] = Field(default_factory=list)
+    reference_summary: dict[str, Any] | None = None
+
 
 
 def _to_strategy_dict(strategy: ProductionStrategy) -> dict[str, Any]:
@@ -204,19 +210,35 @@ class AgentPipeline:
         p_sec = ""
         c_sec = ""
         s_sec = ""
+        ref_patterns: list[ExamPatternCard] = []
+        ref_phrasings: list[ConditionPhrasing] = []
+        ref_style: SolutionStyle | None = None
         if self.reference_runnable is not None:
             topics = ",".join(planner_out.core_concepts)
             if topics:
                 self._emit(
-                    EventStage.PLANNER,
+                    EventStage.REFERENCE,
                     "started",
                     "참조 자산(출제 패턴·조건 관례·해설 가이드) 검색",
                 )
                 ref_res = self.reference_runnable.invoke({"topics": topics})
-                p_sec = ideator_pattern_section(ref_res.get("patterns", []))
-                c_sec = generator_condition_section(ref_res.get("phrasings", []))
-                s_sec = generator_style_section(ref_res.get("style"))
-                self._emit(EventStage.PLANNER, "done", "참조 자산 주입 완료")
+                ref_patterns = ref_res.get("patterns", [])
+                ref_phrasings = ref_res.get("phrasings", [])
+                ref_style = ref_res.get("style")
+                p_sec = ideator_pattern_section(ref_patterns)
+                c_sec = generator_condition_section(ref_phrasings)
+                s_sec = generator_style_section(ref_style)
+                self._emit(
+                    EventStage.REFERENCE,
+                    "done",
+                    "참조 자산 주입 완료",
+                    data={
+                        "exam_patterns": len(ref_patterns),
+                        "condition_phrasings": len(ref_phrasings),
+                        "style_unit": ref_style.unit if ref_style else None,
+                    },
+                )
+
 
         strategy = _to_strategy_dict(planner_out.strategy)
         if not strategy_brief:
@@ -314,7 +336,9 @@ class AgentPipeline:
             adopted_ideas=selection.adopted_ideas,
             candidates=candidates,
             ranking=ranking,
+            reference_summary=build_reference_summary(ref_patterns, ref_phrasings, ref_style),
         )
+
         self._emit(EventStage.DONE, "done", f"완료 — 후보 {len(report.candidates)}건")
         self._write_report(run_id, report)
         return report
@@ -399,11 +423,21 @@ class AgentPipeline:
             style_section=style_section,
         )
 
+        self._emit(EventStage.SKILL_MAPPING, "started", "지식체계 스킬 매핑", candidate_id)
         skill_evidences = assign_skill_ids(
             candidate.solution_steps,
             concepts=core_concepts or blueprint.preserved_concepts,
         )
         candidate.transformation_evidence.extend(skill_evidences)
+        matched = sum(1 for ev in skill_evidences if ev.get("skill_id") is not None)
+        self._emit(
+            EventStage.SKILL_MAPPING,
+            "done",
+            f"매핑 완료 ({matched}/{len(skill_evidences)})",
+            candidate_id,
+            data={"matched": matched, "total": len(skill_evidences)},
+        )
+
 
         from math_variant.services.similarity import similarity_report
 
