@@ -157,6 +157,7 @@ class AgentPipeline:
         status: Literal["started", "done", "failed"],
         message: str = "",
         candidate_id: str | None = None,
+        data: dict[str, Any] | None = None,
     ) -> None:
         if self.on_event is None:
             return
@@ -170,8 +171,10 @@ class AgentPipeline:
                 status=status,
                 message=message,
                 candidate_id=candidate_id,
+                data=data or {},
             )
         )
+
 
     def run(
         self, source_text: str, strategy_brief: str = "", difficulty_target: str = ""

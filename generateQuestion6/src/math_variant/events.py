@@ -18,6 +18,7 @@ class EventStage(StrEnum):
     """파이프라인 진행 단계."""
 
     PLANNER = "planner"
+    REFERENCE = "reference"
     IDEATION = "ideation"
     SELECTION = "selection"
     GENERATION = "generation"
@@ -25,8 +26,11 @@ class EventStage(StrEnum):
     SANDBOX = "sandbox"
     BLIND = "blind"
     CRITIC = "critic"
+    SKILL_MAPPING = "skill_mapping"
+    STYLE_ALIGN = "style_align"
     JUDGE = "judge"
     DONE = "done"
+
 
 
 ROLE_TO_STAGE: dict[str, EventStage] = {
